@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Hill Driver – Tính Tiền Xe Đo Ngoài",
+  "short_name": "Hill Driver",
+  "description": "Tính cước xe đo ngoài, sổ chạy xe và quản lý khách quen cho tài xế.",
+  "lang": "vi",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EEF2FF",
+  "theme_color": "#4F46E5",
+  "categories": ["navigation", "business", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
