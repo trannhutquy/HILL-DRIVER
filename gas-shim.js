@@ -18,6 +18,10 @@
   var DIRECT_TIMEOUT_MS = 9000; // gọi trực tiếp dịch vụ bản đồ: quá 9s thì quay về cách cũ
 
   var NOMINATIM = 'https://nominatim.openstreetmap.org';
+  // Dịch vụ dự phòng: Photon (komoot) cũng dùng dữ liệu OpenStreetMap nhưng
+  // được thiết kế cho tìm kiếm/gợi ý địa chỉ, có CORS cho trình duyệt và ít bị
+  // chặn hơn Nominatim. Dùng khi Nominatim báo bận/chặn (HTTP 403, 429...).
+  var PHOTON = 'https://photon.komoot.io';
   var OSRM = 'https://router.project-osrm.org';
   var METEO = 'https://api.open-meteo.com/v1/forecast';
   // Bán kính ưu tiên (không phải giới hạn cứng): địa chỉ quanh vị trí hiện tại
@@ -25,6 +29,8 @@
   // bounded=1 nên địa chỉ ngoài 20km biến mất khỏi danh sách gợi ý).
   var SUGGEST_RADIUS_KM = 20;
   var GEOCODE_BIAS_RADIUS_KM = 50; // ưu tiên nhẹ quanh điểm đi khi tìm toạ độ điểm đến
+  var NOMINATIM_BLOCK_MS = 10 * 60 * 1000; // Nominatim lỗi -> tạm dùng Photon 10 phút
+  var nominatimBlockedUntil = 0;
 
   var lastApiAt = Date.now();
 
@@ -180,6 +186,75 @@
     return (lng - lngDelta) + ',' + (lat + latDelta) + ',' + (lng + lngDelta) + ',' + (lat - latDelta);
   }
 
+  // ------------------------------------------------------------------
+  // DỰ PHÒNG PHOTON: cùng dữ liệu OpenStreetMap, trả kết quả đúng dạng
+  // { lat, lng, displayName } như Nominatim để phần còn lại không phải sửa.
+  // ------------------------------------------------------------------
+  function nominatimBlocked() { return Date.now() < nominatimBlockedUntil; }
+  function markNominatimBlocked() { nominatimBlockedUntil = Date.now() + NOMINATIM_BLOCK_MS; }
+
+  // Photon đôi khi trả 503/429 khi có nhiều yêu cầu dồn dập -> thử lại tối đa
+  // 3 lần (chờ 0,8s rồi 1,8s) thay vì báo lỗi ngay.
+  function delay(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+  function photonFetch(url) {
+    var attemptNo = 0;
+    function attempt() {
+      attemptNo++;
+      return fetchJson(url).catch(function (err) {
+        if (attemptNo >= 3) throw err;
+        return delay(attemptNo === 1 ? 800 : 1800).then(attempt);
+      });
+    }
+    return attempt();
+  }
+
+  function photonDisplayName(p) {
+    p = p || {};
+    var parts = [];
+    function add(v) {
+      v = String(v || '').trim();
+      if (v && parts.indexOf(v) === -1) parts.push(v);
+    }
+    var street = String(p.street || '').trim();
+    var house = String(p.housenumber || '').trim();
+    if (house && street && street.indexOf(house) === -1) street = house + ' ' + street;
+    else if (house && !street) street = house;
+    if (!street) street = String(p.name || '').trim();
+    add(street);
+    add(p.locality);
+    add(p.district);
+    add(p.city);
+    add(p.state);
+    add(p.country);
+    return parts.join(', ');
+  }
+
+  function photonSearch(query, nearLat, nearLng, limit) {
+    var url = PHOTON + '/api/?q=' + encodeURIComponent(query) + '&limit=' + (limit || 6);
+    var lat = Number(nearLat), lng = Number(nearLng);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) > 0.0001 && Math.abs(lng) > 0.0001) {
+      url += '&lat=' + lat + '&lon=' + lng;
+    }
+    return photonFetch(url).then(function(j) {
+      var feats = (j && j.features) || [];
+      return feats.map(function(f) {
+        var c = (f.geometry && f.geometry.coordinates) || [];
+        return { lat: Number(c[1]), lng: Number(c[0]), displayName: photonDisplayName(f.properties) };
+      }).filter(function(it) { return !isNaN(it.lat) && !isNaN(it.lng) && it.displayName; });
+    });
+  }
+
+  function photonReverse(lat, lng) {
+    var url = PHOTON + '/reverse?lon=' + lng + '&lat=' + lat + '&limit=1';
+    return photonFetch(url).then(function(j) {
+      var feats = (j && j.features) || [];
+      if (!feats.length) return '';
+      return photonDisplayName(feats[0].properties);
+    });
+  }
+
   // Giải mã polyline (độ chính xác 5 chữ số) của OSRM -> [[lat,lng], ...]
   function decodePolyline(str) {
     var index = 0, lat = 0, lng = 0, out = [];
@@ -215,9 +290,25 @@
     var key = 'sg:' + keyRaw;
     var hit = cacheGet(key);
     if (hit) return Promise.resolve({ success: true, items: hit });
-    return fetchJson(url).then(function (arr) {
-      if (!Array.isArray(arr)) throw new Error('bad');
-      var items = arr.map(function (it) { return { lat: parseFloat(it.lat), lng: parseFloat(it.lon), displayName: it.display_name }; });
+
+    function viaNominatim() {
+      return fetchJson(url).then(function (arr) {
+        if (!Array.isArray(arr)) throw new Error('bad');
+        return arr.map(function (it) { return { lat: parseFloat(it.lat), lng: parseFloat(it.lon), displayName: it.display_name }; });
+      });
+    }
+    function viaPhoton() { return photonSearch(query, lat, lng, 6); }
+
+    // Nominatim lỗi/chặn -> tự chuyển Photon; Nominatim không có kết quả -> thử Photon.
+    var p;
+    if (nominatimBlocked()) {
+      p = viaPhoton();
+    } else {
+      p = viaNominatim()
+        .catch(function () { markNominatimBlocked(); return []; })
+        .then(function (items) { return (items && items.length) ? items : viaPhoton(); });
+    }
+    return p.then(function (items) {
       cachePut(key, items);
       return { success: true, items: items };
     });
@@ -235,12 +326,32 @@
     if (hit) return Promise.resolve(hit);
     var url = NOMINATIM + '/search?format=json&addressdetails=1&accept-language=vi&limit=1&countrycodes=vn&q=' + encodeURIComponent(address);
     if (hasNear) url += '&viewbox=' + viewbox(lat, lng, GEOCODE_BIAS_RADIUS_KM);
-    return fetchJson(url).then(function (json) {
-      if (!Array.isArray(json)) throw new Error('bad');
-      if (json.length === 0) {
+
+    function viaNominatim() {
+      return fetchJson(url).then(function (json) {
+        if (!Array.isArray(json)) throw new Error('bad');
+        if (json.length === 0) return null;
+        return { lat: parseFloat(json[0].lat), lng: parseFloat(json[0].lon), displayName: json[0].display_name };
+      });
+    }
+    function viaPhoton() {
+      return photonSearch(address, lat, lng, 5).then(function (items) { return items.length ? items[0] : null; });
+    }
+
+    // Nominatim bận/chặn hoặc không có kết quả -> thử Photon trước khi báo lỗi.
+    var p;
+    if (nominatimBlocked()) {
+      p = viaPhoton();
+    } else {
+      p = viaNominatim()
+        .catch(function () { markNominatimBlocked(); return null; })
+        .then(function (first) { return first || viaPhoton(); });
+    }
+    return p.then(function (first) {
+      if (!first) {
         return { success: false, message: 'Không tìm thấy địa chỉ "' + address + '". Hãy nhập rõ hơn (số nhà, đường, phường/xã, quận/huyện, tỉnh/thành) hoặc dùng nút "Lấy vị trí hiện tại".' };
       }
-      var res = { success: true, lat: parseFloat(json[0].lat), lng: parseFloat(json[0].lon), displayName: json[0].display_name };
+      var res = { success: true, lat: first.lat, lng: first.lng, displayName: first.displayName };
       cachePut(key, res);
       return res;
     });
@@ -255,9 +366,25 @@
     // accept-language=vi + zoom=18: lấy địa chỉ chi tiết nhất (tới đường/số nhà
     // nếu OpenStreetMap có dữ liệu) và hiển thị bằng tiếng Việt.
     var url = NOMINATIM + '/reverse?format=json&addressdetails=1&accept-language=vi&zoom=18&lat=' + lat + '&lon=' + lng;
-    return fetchJson(url).then(function (json) {
-      if (!json || json.error) throw new Error('bad');
-      var res = { success: true, displayName: json.display_name || (lat.toFixed(6) + ', ' + lng.toFixed(6)) };
+
+    function viaNominatim() {
+      return fetchJson(url).then(function (json) {
+        if (!json || json.error) throw new Error('bad');
+        return json.display_name || '';
+      });
+    }
+    function viaPhoton() { return photonReverse(lat, lng); }
+
+    var p;
+    if (nominatimBlocked()) {
+      p = viaPhoton();
+    } else {
+      p = viaNominatim()
+        .catch(function () { markNominatimBlocked(); return ''; })
+        .then(function (name) { return name || viaPhoton(); });
+    }
+    return p.then(function (name) {
+      var res = { success: true, displayName: name || (lat.toFixed(6) + ', ' + lng.toFixed(6)) };
       cachePut(key, res);
       return res;
     });
