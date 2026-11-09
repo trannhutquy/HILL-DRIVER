@@ -399,15 +399,170 @@
     });
   }
 
-  // Thời tiết hiện tại tại 1 điểm; lỗi/quá 4 giây -> null (server coi như không mưa, giống hành vi cũ)
+  // ------------------------------------------------------------------
+  // THỜI TIẾT CHÍNH XÁC HƠN
+  // - Lấy 1 lần: hiện tại + nowcast 15 phút (90 phút tới) + dự báo theo giờ.
+  // - "Đang mưa" = mã WMO báo mưa/dông, hoặc lượng mưa hiện tại, hoặc nowcast
+  //   của chính khung 15 phút đang diễn ra (bắt được lúc mưa vừa bắt đầu mà
+  //   trường "current" của Open-Meteo chưa kịp cập nhật).
+  // - "Sắp mưa" = trong 90 phút tới có khung 15 phút báo mưa với xác suất đủ cao.
+  // - Kèm cảm giác như/độ ẩm/gió/mây để hiển thị chi tiết, đúng hơn.
+  // - Cache 5 phút theo ô ~1km: bấm lại hoặc vừa tính tiền xong không gọi API liên tục.
+  // ------------------------------------------------------------------
+  var WX_TTL = 5 * 60 * 1000;
+  var WX_MEM = {};
+  var WX_RAIN_CODES = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99];
+  var WX_STORM_CODES = [95, 96, 99];
+  var WX_CLOUD_CODES = [2, 3, 45, 48];
+  var WX_FIELDS = 'current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m' +
+    '&minutely_15=precipitation,precipitation_probability,weather_code' +
+    '&hourly=precipitation,precipitation_probability,weather_code' +
+    '&forecast_minutely_15=8&forecast_hours=6&timezone=auto';
+
+  function wxNum(v, d) { var n = Number(v); return isNaN(n) ? (d === undefined ? 0 : d) : n; }
+  function wxIsRainCode(code) { return WX_RAIN_CODES.indexOf(Number(code)) !== -1; }
+  function wxIsStormCode(code) { return WX_STORM_CODES.indexOf(Number(code)) !== -1; }
+
+  // Nhãn tiếng Việt theo mã WMO (để title/badge dễ hiểu thay vì chỉ "nắng/mây/mưa")
+  function wxCodeLabel(code, isDay) {
+    switch (Number(code)) {
+      case 0: return isDay ? 'Trời quang' : 'Trời quang (ban đêm)';
+      case 1: return 'Ít mây';
+      case 2: return 'Có mây';
+      case 3: return 'Nhiều mây';
+      case 45: case 48: return 'Sương mù';
+      case 51: return 'Mưa phùn nhẹ';
+      case 53: return 'Mưa phùn';
+      case 55: return 'Mưa phùn dày';
+      case 56: case 57: return 'Mưa phùn đóng băng';
+      case 61: return 'Mưa nhỏ';
+      case 63: return 'Mưa vừa';
+      case 65: return 'Mưa to';
+      case 66: case 67: return 'Mưa đóng băng';
+      case 71: case 73: case 75: return 'Tuyết rơi';
+      case 77: return 'Mưa tuyết';
+      case 80: return 'Mưa rào nhỏ';
+      case 81: return 'Mưa rào vừa';
+      case 82: return 'Mưa rào rất to';
+      case 85: case 86: return 'Mưa tuyết rào';
+      case 95: return 'Dông';
+      case 96: case 99: return 'Dông kèm mưa đá';
+      default: return 'Không rõ';
+    }
+  }
+
+  // Chuẩn hoá phản hồi Open-Meteo -> object dùng chung cho badge + tính tiền.
+  function wxNormalize(json) {
+    json = json || {};
+    var c = json.current || {};
+    var m = json.minutely_15 || {};
+    var times = m.time || [];
+    var precs = m.precipitation || [];
+    var probs = m.precipitation_probability || [];
+    var codes = m.weather_code || [];
+
+    var code = wxNum(c.weather_code, NaN);
+    var curPrecip = wxNum(c.precipitation, 0);
+    var slot0Precip = precs.length ? wxNum(precs[0], 0) : 0;
+    var slot0Prob = probs.length ? wxNum(probs[0], 0) : 0;
+    var slot0Code = codes.length ? wxNum(codes[0], NaN) : NaN;
+    if (isNaN(code) && !isNaN(slot0Code)) code = slot0Code;
+
+    // Đang mưa: mã WMO là tín hiệu mạnh nhất; nếu chỉ có lượng mưa thì
+    // cần thêm xác suất để tránh nhiễu của mô hình.
+    var amount = Math.max(curPrecip, slot0Precip);
+    var rainByCode = wxIsRainCode(code) || wxIsRainCode(slot0Code);
+    var rainByAmount = amount >= 0.2;
+    var rainByLight = amount >= 0.1 && slot0Prob >= 50;
+    var isRaining = rainByCode || rainByAmount || rainByLight;
+
+    // Xác suất mưa cao nhất trong 60 phút tới
+    var probNextHour = 0;
+    for (var i = 0; i < Math.min(4, probs.length); i++) probNextHour = Math.max(probNextHour, wxNum(probs[i], 0));
+    if (!probs.length) {
+      var hp = (json.hourly || {}).precipitation_probability || [];
+      if (hp.length) probNextHour = wxNum(hp[0], 0);
+    }
+
+    // Sắp mưa: quét các khung 15 phút từ 15 đến 90 phút tới
+    var rainSoonMin = null;
+    for (var j = 1; j < Math.min(6, times.length); j++) {
+      var p = wxNum(precs[j], 0);
+      var pr = wxNum(probs[j], 0);
+      var cd = wxNum(codes[j], NaN);
+      var hit = (wxIsRainCode(cd) && pr >= 40) || (p >= 0.2 && pr >= 50) || (p >= 0.1 && pr >= 70);
+      if (hit) { rainSoonMin = j * 15; break; }
+    }
+    if (rainSoonMin === null && !times.length) {
+      var hh = json.hourly || {};
+      var hp2 = hh.precipitation_probability || [];
+      var hprec = hh.precipitation || [];
+      if (hp2.length > 1 && wxNum(hp2[1], 0) >= 60 && wxNum(hprec[1], 0) >= 0.1) rainSoonMin = 60;
+    }
+
+    var temp = wxNum(c.temperature_2m, NaN);
+    var feels = wxNum(c.apparent_temperature, NaN);
+    var isDay = (c.is_day === undefined || c.is_day === null) ? 1 : wxNum(c.is_day, 1);
+
+    var category;
+    if (isRaining || wxIsStormCode(code)) category = 'rain';
+    else if (WX_CLOUD_CODES.indexOf(Number(code)) !== -1 || wxNum(c.cloud_cover, 0) >= 60) category = 'cloud';
+    else category = 'sun';
+
+    return {
+      success: true,
+      code: isNaN(code) ? null : code,
+      codeLabel: wxCodeLabel(code, isDay),
+      category: category,
+      isDay: isDay,
+      isRaining: !!isRaining,
+      isStorm: wxIsStormCode(code),
+      rainSoonMin: rainSoonMin,
+      rainProbabilityNextHour: probNextHour,
+      tempC: isNaN(temp) ? null : Math.round(temp),
+      apparentTempC: isNaN(feels) ? null : Math.round(feels),
+      humidity: (c.relative_humidity_2m === undefined || c.relative_humidity_2m === null) ? null : Math.round(wxNum(c.relative_humidity_2m, 0)),
+      windKmh: (c.wind_speed_10m === undefined || c.wind_speed_10m === null) ? null : Math.round(wxNum(c.wind_speed_10m, 0)),
+      gustKmh: (c.wind_gusts_10m === undefined || c.wind_gusts_10m === null) ? null : Math.round(wxNum(c.wind_gusts_10m, 0)),
+      cloudCover: (c.cloud_cover === undefined || c.cloud_cover === null) ? null : Math.round(wxNum(c.cloud_cover, 0)),
+      precipitation: amount,
+      updatedAt: Date.now()
+    };
+  }
+
+  function weatherFetch(lat, lng) {
+    lat = Number(lat); lng = Number(lng);
+    if (isNaN(lat) || isNaN(lng)) return Promise.reject(new Error('toạ độ lỗi'));
+    var key = (Math.round(lat * 100) / 100) + ',' + (Math.round(lng * 100) / 100);
+    var hit = WX_MEM[key];
+    if (hit && Date.now() - hit.t < WX_TTL) return Promise.resolve(hit.v);
+    var url = METEO + '?latitude=' + lat + '&longitude=' + lng + '&' + WX_FIELDS;
+    return fetchJson(url, 6000).then(function (j) {
+      var w = wxNormalize(j);
+      WX_MEM[key] = { t: Date.now(), v: w };
+      return w;
+    });
+  }
+
+  // Dùng cho tính tiền: giữ đúng dạng {code, precipitation} mà server đang đọc,
+  // nhưng đã gộp nowcast 15 phút -> bắt được lúc mưa vừa bắt đầu.
   function weatherAt(lat, lng) {
-    var url = METEO + '?latitude=' + lat + '&longitude=' + lng + '&current=precipitation,weather_code&timezone=auto';
-    return fetchJson(url, 4000).then(function (j) {
-      var c = j && j.current;
-      if (!c) return null;
-      return { code: Number(c.weather_code), precipitation: Number(c.precipitation || 0) };
+    return weatherFetch(lat, lng).then(function (w) {
+      return {
+        code: w.code,
+        precipitation: w.precipitation,
+        isRaining: w.isRaining,
+        rainSoonMin: w.rainSoonMin,
+        probability: w.rainProbabilityNextHour
+      };
     }).catch(function () { return null; });
   }
+
+  // Badge thời tiết: gọi trực tiếp từ điện thoại (nhanh, không qua Apps Script).
+  // Lỗi mạng -> run() tự quay về Apps Script như cũ.
+  DIRECT.getWeatherIcon = function (lat, lng) {
+    return weatherFetch(lat, lng);
+  };
 
   // Tính tiền: đường đi + thời tiết 2 đầu chạy SONG SONG ngay trên điện thoại,
   // rồi gửi lên Apps Script đúng 1 lần để áp bảng giá / phụ thu.

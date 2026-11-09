@@ -445,9 +445,14 @@
     .weather-badge:hover { background: #E0E7FF; }
     .weather-badge:active { transform: scale(0.95); }
     .weather-temp { font-size: 12px; font-weight: 700; color: #4338CA; }
+    /* Nhãn nhỏ "Đang mưa" / "Mưa ~30′" hiện ngay trên badge, không cần mở gì thêm */
+    .weather-rain-hint { font-size: 10px; font-weight: 800; letter-spacing: .01em; color: #0D47A1; background: #DBEAFE; border: 1px solid #BFDBFE; border-radius: 9px; padding: 1px 5px; margin-left: 2px; white-space: nowrap; line-height: 1.5; }
+    .weather-rain-hint.is-now { color: #7f1d1d; background: #FEE2E2; border-color: #FECACA; }
     body.dark .weather-badge { background: #2b2545; border-color: #3e3660; }
     body.dark .weather-badge:hover { background: #332c50; }
     body.dark .weather-temp { color: #A5B4FC; }
+    body.dark .weather-rain-hint { color: #93C5FD; background: #1e3a5f; border-color: #2C4A73; }
+    body.dark .weather-rain-hint.is-now { color: #FCA5A5; background: #3a1414; border-color: #5c2020; }
     #weatherIcon { display: flex; align-items: center; justify-content: center; line-height: 0; }
     #weatherIcon svg { display: block; width: 22px; height: 22px; }
     #weatherIcon.state-sun svg { animation: weatherMascotBob 1.5s ease-in-out infinite; }
@@ -2580,7 +2585,7 @@
         <span class="topbar-brand">Xin chào, <b id="userNameDisplay"></b></span>
         <div class="topbar-right">
           <span class="weather-badge hidden" id="weatherBadge" onclick="loadWeatherIcon()" title="Thời tiết hiện tại (bấm để làm mới)">
-            <span id="weatherIcon" class="state-sun"></span><span class="weather-temp" id="weatherTemp"></span>
+            <span id="weatherIcon" class="state-sun"></span><span class="weather-temp" id="weatherTemp"></span><span class="weather-rain-hint hidden" id="weatherRainHint"></span>
           </span>
           <button class="logout" onclick="doLogout()">Đăng xuất</button>
         </div>
@@ -3260,7 +3265,7 @@
     const ONBOARD_KEY = 'taxiapp_onboarded';
     // Phiên bản app hiển thị ở tab Cài đặt. Mỗi lần phát hành bản mới, tăng số này
     // ĐỒNG THỜI với VERSION trong sw.js để người dùng nhận được bản cập nhật.
-    const APP_VERSION = 'v9';
+    const APP_VERSION = 'v10';
     const fieldCoords = { origin: null, destination: null };
     let mapPicker = null;          // instance bản đồ Leaflet dùng riêng cho modal chọn vị trí
     let mapPickerWhich = null;     // 'origin' hoặc 'destination' đang được chọn
@@ -4387,6 +4392,11 @@
     };
     const WEATHER_LABELS = { sun: 'Trời nắng', cloud: 'Trời nhiều mây', rain: 'Trời đang mưa', moon: 'Trời quang (ban đêm)', cloudNight: 'Nhiều mây (ban đêm)' };
 
+    // Tự cập nhật lại thời tiết mỗi 15 phút, và ngay khi quay lại app sau >10 phút,
+    // để badge không bị "đóng băng" ở trạng thái lúc mới mở app.
+    let weatherRefreshTimer = null;
+    let lastWeatherAt = 0;
+
     function loadWeatherIcon() {
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition(
@@ -4394,30 +4404,77 @@
           applyWeatherIcon(pos.coords.latitude, pos.coords.longitude);
         },
         function() { /* không xin quyền được -> giữ ẩn biểu tượng, không làm phiền người dùng */ },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 10 * 60 * 1000 }
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 }
       );
     }
+
+    function scheduleWeatherRefresh_() {
+      lastWeatherAt = Date.now();
+      if (weatherRefreshTimer) clearTimeout(weatherRefreshTimer);
+      weatherRefreshTimer = setTimeout(function() { loadWeatherIcon(); }, 15 * 60 * 1000);
+    }
+
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible' && lastWeatherAt && (Date.now() - lastWeatherAt) > 10 * 60 * 1000) {
+        loadWeatherIcon();
+      }
+    });
 
     function applyWeatherIcon(lat, lng) {
       google.script.run
         .withSuccessHandler(function(res) {
           if (!res || !res.success) return;
           const badge = document.getElementById('weatherBadge');
-          const category = WEATHER_ICONS[res.category] ? res.category : 'sun';
-          // Ban đêm (is_day = 0): đổi sang biểu tượng trăng cho đa dạng, thay vì luôn dùng biểu tượng nắng/mây ban ngày
           const isDay = res.isDay !== 0;
+          const category = WEATHER_ICONS[res.category] ? res.category : 'sun';
+          const raining = (res.isRaining === true) || category === 'rain';
+          // Ban đêm (is_day = 0): đổi sang biểu tượng trăng cho đa dạng, thay vì luôn dùng biểu tượng nắng/mây ban ngày
           let iconKey = category;
           if (!isDay) {
             if (category === 'sun') iconKey = 'moon';
             else if (category === 'cloud') iconKey = 'cloudNight';
           }
-          const label = WEATHER_LABELS[iconKey] || WEATHER_LABELS[category] || '';
+          const label = res.codeLabel || WEATHER_LABELS[iconKey] || WEATHER_LABELS[category] || '';
           const iconEl = document.getElementById('weatherIcon');
           iconEl.innerHTML = WEATHER_ICONS[iconKey];
           iconEl.className = 'state-' + iconKey;
           document.getElementById('weatherTemp').textContent = (res.tempC !== null && res.tempC !== undefined) ? (res.tempC + '°') : '';
-          badge.title = label + ' (bấm để làm mới)';
+
+          // Nhãn mưa ngay trên badge: "Đang mưa" hoặc "Mưa ~30′" (dự báo 90 phút tới)
+          const hintEl = document.getElementById('weatherRainHint');
+          if (hintEl) {
+            const soonMin = Number(res.rainSoonMin);
+            if (raining) {
+              hintEl.textContent = 'Đang mưa';
+              hintEl.className = 'weather-rain-hint is-now';
+            } else if (!isNaN(soonMin) && soonMin > 0 && soonMin <= 90) {
+              hintEl.textContent = (soonMin <= 15 ? 'Mưa ngay' : 'Mưa ~' + soonMin + '′');
+              hintEl.className = 'weather-rain-hint';
+            } else {
+              hintEl.textContent = '';
+              hintEl.className = 'weather-rain-hint hidden';
+            }
+          }
+
+          // Title đầy đủ (giữ chạm để xem trên điện thoại): tình trạng, nhiệt độ,
+          // cảm giác như, khả năng mưa, độ ẩm, gió.
+          const bits = [label];
+          if (res.tempC !== null && res.tempC !== undefined) bits.push(res.tempC + '°');
+          if (res.apparentTempC !== null && res.apparentTempC !== undefined && res.apparentTempC !== res.tempC) {
+            bits.push('cảm giác ' + res.apparentTempC + '°');
+          }
+          if (raining) bits.push('đang mưa');
+          else if (res.rainSoonMin) bits.push('mưa trong ~' + res.rainSoonMin + ' phút');
+          if (res.rainProbabilityNextHour !== null && res.rainProbabilityNextHour !== undefined) {
+            bits.push('khả năng mưa ' + res.rainProbabilityNextHour + '%/giờ tới');
+          }
+          if (res.humidity !== null && res.humidity !== undefined) bits.push('độ ẩm ' + res.humidity + '%');
+          if (res.windKmh !== null && res.windKmh !== undefined) bits.push('gió ' + res.windKmh + ' km/h');
+          const title = bits.join(' · ') + ' (bấm để làm mới)';
+          badge.title = title;
+          badge.setAttribute('aria-label', title);
           badge.classList.remove('hidden');
+          scheduleWeatherRefresh_();
         })
         .withFailureHandler(function() { /* bỏ qua lỗi, giữ nguyên trạng thái badge hiện tại */ })
         .getWeatherIcon(lat, lng);
