@@ -143,6 +143,9 @@
   var LS_PREFIX = 'hdc:';
   var CACHE_TTL = 6 * 3600 * 1000;
   var LS_MAX = 120;
+  // Gộp các lệnh ĐANG chạy trùng nhau (vd vừa tải trước vừa bấm tính tiền) -> chỉ 1 request
+  var GEO_INFLIGHT = {};
+  var ROUTE_INFLIGHT = {};
   function cacheGet(key) {
     var m = MEM[key];
     if (m && Date.now() - m.t < CACHE_TTL) return m.v;
@@ -324,6 +327,7 @@
     var key = 'geo:' + normText(address) + (hasNear ? '|' + lat.toFixed(2) + ',' + lng.toFixed(2) : '');
     var hit = cacheGet(key);
     if (hit) return Promise.resolve(hit);
+    if (GEO_INFLIGHT[key]) return GEO_INFLIGHT[key];
     var url = NOMINATIM + '/search?format=json&addressdetails=1&accept-language=vi&limit=1&countrycodes=vn&q=' + encodeURIComponent(address);
     if (hasNear) url += '&viewbox=' + viewbox(lat, lng, GEOCODE_BIAS_RADIUS_KM);
 
@@ -347,7 +351,7 @@
         .catch(function () { markNominatimBlocked(); return null; })
         .then(function (first) { return first || viaPhoton(); });
     }
-    return p.then(function (first) {
+    var out = p.then(function (first) {
       if (!first) {
         return { success: false, message: 'Không tìm thấy địa chỉ "' + address + '". Hãy nhập rõ hơn (số nhà, đường, phường/xã, quận/huyện, tỉnh/thành) hoặc dùng nút "Lấy vị trí hiện tại".' };
       }
@@ -355,8 +359,11 @@
       cachePut(key, res);
       return res;
     });
+    GEO_INFLIGHT[key] = out;
+    function clearInflight() { delete GEO_INFLIGHT[key]; }
+    out.then(clearInflight, clearInflight);
+    return out;
   };
-
   // Toạ độ -> địa chỉ chữ
   DIRECT.reverseGeocode = function (lat, lng) {
     lat = Number(lat); lng = Number(lng);
@@ -390,13 +397,29 @@
     });
   };
 
+  // Cache tuyến đường ngắn hạn: cùng 1 chuyến bấm lại / sửa đồ ăn / đổi phụ thu
+  // sẽ không phải gọi OSRM lại -> kết quả hiện ra gần như tức thì.
+  var ROUTE_TTL = 3 * 60 * 1000; // 3 phút
+  var ROUTE_MEM = {};
+
   function osrmRoute(oLat, oLng, dLat, dLng) {
+    var key = Number(oLat).toFixed(5) + ',' + Number(oLng).toFixed(5) + ';' +
+              Number(dLat).toFixed(5) + ',' + Number(dLng).toFixed(5);
+    var hit = ROUTE_MEM[key];
+    if (hit && Date.now() - hit.t < ROUTE_TTL) return Promise.resolve(hit.v);
+    if (ROUTE_INFLIGHT[key]) return ROUTE_INFLIGHT[key];
     var url = OSRM + '/route/v1/driving/' + oLng + ',' + oLat + ';' + dLng + ',' + dLat + '?overview=full&geometries=polyline';
-    return fetchJson(url, 12000).then(function (json) {
+    var out = fetchJson(url, 12000).then(function (json) {
       if (!json || json.code !== 'Ok' || !json.routes || !json.routes.length) throw new Error('no route');
       var r = json.routes[0];
-      return { distanceKm: r.distance / 1000, durationMin: r.duration / 60, path: decodePolyline(r.geometry) };
+      var v = { distanceKm: r.distance / 1000, durationMin: r.duration / 60, path: decodePolyline(r.geometry) };
+      ROUTE_MEM[key] = { t: Date.now(), v: v };
+      return v;
     });
+    ROUTE_INFLIGHT[key] = out;
+    function clearRouteInflight() { delete ROUTE_INFLIGHT[key]; }
+    out.then(clearRouteInflight, clearRouteInflight);
+    return out;
   }
 
   // ------------------------------------------------------------------
@@ -580,6 +603,23 @@
             return res; // lỗi nghiệp vụ khác: trả nguyên cho giao diện hiển thị
           });
       });
+  };
+
+  // Tải trước tuyến đường + thời tiết khi đã có đủ 2 toạ độ (người dùng vừa chọn
+  // điểm đi/đến hoặc lấy GPS). Nhờ vậy lúc bấm "Tính tiền" chỉ còn chờ đúng 1
+  // lệnh máy chủ để áp bảng giá/phụ thu.
+  window.__hdPrefetchTrip = function (oLat, oLng, dLat, dLng) {
+    oLat = Number(oLat); oLng = Number(oLng); dLat = Number(dLat); dLng = Number(dLng);
+    if (isNaN(oLat) || isNaN(oLng) || isNaN(dLat) || isNaN(dLng)) return Promise.resolve();
+    return Promise.all([osrmRoute(oLat, oLng, dLat, dLng), weatherAt(oLat, oLng), weatherAt(dLat, dLng)])
+      .then(function () {}, function () {});
+  };
+
+  // Đánh thức Apps Script sớm (ngay khi người dùng bắt đầu nhập địa chỉ) để tránh
+  // bị "khởi động lạnh" đúng lúc bấm "Tính tiền". Chỉ gọi tối đa ~1 lần/phút.
+  window.__hdPrewarm = function () {
+    if (Date.now() - lastApiAt < 60 * 1000) return Promise.resolve();
+    return callApi('ping', []).then(function () {}, function () {});
   };
 
   function run(prop, args) {

@@ -3563,8 +3563,14 @@
     const ONBOARD_KEY = 'taxiapp_onboarded';
     // Phiên bản app hiển thị ở tab Cài đặt. Mỗi lần phát hành bản mới, tăng số này
     // ĐỒNG THỜI với VERSION trong sw.js để người dùng nhận được bản cập nhật.
-    const APP_VERSION = 'v11';
+    const APP_VERSION = 'v12';
     const fieldCoords = { origin: null, destination: null };
+    // Tải trước để bấm "Tính tiền" nhanh hơn:
+    // - prefetchedGeo: toạ độ đã tìm sẵn trong lúc người dùng đang gõ địa chỉ
+    // - tripPrefetchTimer_: gom các lần đổi điểm đi/đến rồi tải trước tuyến đường + thời tiết
+    const prefetchedGeo = { origin: null, destination: null };
+    const geoPrefetchTimers = { origin: null, destination: null };
+    let tripPrefetchTimer_ = null;
     let mapPicker = null;          // instance bản đồ Leaflet dùng riêng cho modal chọn vị trí
     let mapPickerWhich = null;     // 'origin' hoặc 'destination' đang được chọn
     let mapPickerCoord = null;     // { lat, lng, label } toạ độ đang ở giữa bản đồ (chưa xác nhận)
@@ -6076,6 +6082,7 @@
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           fieldCoords[which] = { lat: lat, lng: lng };
+          scheduleTripPrefetch_(); // nếu đầu kia đã có toạ độ -> tải trước đường đi + thời tiết
           input.value = 'Đang xác định địa chỉ...';
 
           google.script.run
@@ -6229,6 +6236,7 @@
       document.getElementById(which).value = label;
       updateClearBtnVisibility(which);
       if (which === 'origin') updateDraftBtnState();
+      scheduleTripPrefetch_();
       closeMapPicker();
     }
 
@@ -6268,6 +6276,54 @@
       return base;
     }
 
+    // ---------- TẢI TRƯỚC ĐỂ TÍNH TIỀN NHANH HƠN ----------
+    // Vị trí ưu tiên khi tìm toạ độ: điểm đến ưu tiên quanh điểm đi; còn lại quanh GPS hiện tại.
+    function resolveCoordBias_(which) {
+      if (which === 'destination' && fieldCoords.origin) return fieldCoords.origin;
+      if (myLocationForSuggest) return myLocationForSuggest;
+      return null;
+    }
+
+    function coordBiasKey_(bias) {
+      return bias ? (Number(bias.lat).toFixed(4) + ',' + Number(bias.lng).toFixed(4)) : '';
+    }
+
+    // Người dùng ngừng gõ một nhịp -> tìm sẵn toạ độ ở chế độ nền. Khi bấm
+    // "Tính tiền" mà chưa chọn gợi ý, toạ độ đã có sẵn nên không phải chờ mạng.
+    function prefetchGeocode_(which) {
+      const text = document.getElementById(which).value.trim();
+      if (text.length < 8 || fieldCoords[which]) return;
+      const bias = resolveCoordBias_(which);
+      const biasKey = coordBiasKey_(bias);
+      const pf = prefetchedGeo[which];
+      if (pf && pf.text === text && pf.biasKey === biasKey) return;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          // Bỏ qua nếu người dùng đã sửa nội dung trong lúc chờ
+          if (document.getElementById(which).value.trim() !== text) return;
+          prefetchedGeo[which] = { text: text, biasKey: biasKey, res: res };
+        })
+        .withFailureHandler(function() { /* bỏ qua, lúc tính tiền sẽ tự gọi lại */ })
+        .geocodeAddress(text, bias ? bias.lat : '', bias ? bias.lng : '');
+    }
+
+    // Đã có đủ toạ độ 2 đầu -> tải trước tuyến đường + thời tiết (chạy nền).
+    function scheduleTripPrefetch_() {
+      if (typeof window.__hdPrefetchTrip !== 'function') return;
+      clearTimeout(tripPrefetchTimer_);
+      if (!fieldCoords.origin || !fieldCoords.destination) return;
+      tripPrefetchTimer_ = setTimeout(function() {
+        const o = fieldCoords.origin, d = fieldCoords.destination;
+        if (!o || !d) return;
+        window.__hdPrefetchTrip(o.lat, o.lng, d.lat, d.lng);
+      }, 250);
+    }
+
+    // Đánh thức Apps Script ngay khi bắt đầu nhập địa chỉ (tránh khởi động lạnh).
+    function prewarmBackend_() {
+      if (typeof window.__hdPrewarm === 'function') window.__hdPrewarm();
+    }
+
     function onAddressInput(which) {
       const text = document.getElementById(which).value.trim();
       clearTimeout(addressSearchTimers[which]);
@@ -6277,6 +6333,11 @@
         addressSuggestions[which] = [];
         return;
       }
+
+      prewarmBackend_();
+      // Tìm sẵn toạ độ song song với việc gợi ý địa chỉ (chỉ khi đã gõ đủ dài)
+      clearTimeout(geoPrefetchTimers[which]);
+      geoPrefetchTimers[which] = setTimeout(function() { prefetchGeocode_(which); }, 1600);
 
       const cacheKey = normalizeAddressQuery_(text);
       if (addressSuggestCache.hasOwnProperty(cacheKey)) {
@@ -6292,6 +6353,7 @@
     }
 
     function onAddressFocus(which) {
+      prewarmBackend_(); // đánh thức máy chủ sớm để lúc bấm "Tính tiền" không bị chờ
       primeMyLocationForSuggest_(); // thử lại nếu lần trước chưa xin được quyền định vị kịp
       const text = document.getElementById(which).value.trim();
       if (text.length >= 3 && addressSuggestions[which] && addressSuggestions[which].length > 0) {
@@ -6357,9 +6419,12 @@
 
       document.getElementById(which).value = item.displayName;
       fieldCoords[which] = { lat: item.lat, lng: item.lng };
+      clearTimeout(geoPrefetchTimers[which]); // đã chọn gợi ý -> không cần tìm toạ độ nền nữa
+      prefetchedGeo[which] = null;
       hideSuggestList(which);
       updateClearBtnVisibility(which);
       if (which === 'origin') updateDraftBtnState();
+      scheduleTripPrefetch_(); // đủ 2 đầu -> tải trước đường đi + thời tiết
     }
 
     // ---------- KHÁCH QUEN ----------
@@ -6453,6 +6518,7 @@
         fieldCoords[which] = (c.lat !== null && c.lng !== null) ? { lat: c.lat, lng: c.lng } : null;
         updateClearBtnVisibility(which);
         if (which === 'origin') updateDraftBtnState();
+        scheduleTripPrefetch_();
       }
       if (currentUser) google.script.run.touchCustomerUsage(currentUser.username, id); // không cần chờ kết quả
       closeCustomerPicker();
@@ -6672,16 +6738,25 @@
 
       // Ưu tiên tìm quanh điểm đi (khi tìm điểm đến) hoặc quanh vị trí hiện tại.
       // Giúp tên đường trùng ở nhiều tỉnh/thành không bị chọn nhầm tỉnh khác.
-      let bias = null;
-      if (which === 'destination' && fieldCoords.origin) {
-        bias = fieldCoords.origin;
-      } else if (myLocationForSuggest) {
-        bias = myLocationForSuggest;
+      const bias = resolveCoordBias_(which);
+      const biasKey = coordBiasKey_(bias);
+
+      // Đã tìm sẵn toạ độ trong lúc người dùng gõ -> dùng ngay, không chờ mạng
+      const pf = prefetchedGeo[which];
+      if (pf && pf.text === text && pf.biasKey === biasKey && pf.res) {
+        if (pf.res.success) {
+          fieldCoords[which] = { lat: pf.res.lat, lng: pf.res.lng };
+          onDone(pf.res.lat, pf.res.lng, pf.res.displayName);
+        } else {
+          onError(pf.res.message);
+        }
+        return;
       }
 
       google.script.run
         .withSuccessHandler(function(res) {
           if (res.success) {
+            fieldCoords[which] = { lat: res.lat, lng: res.lng };
             onDone(res.lat, res.lng, res.displayName);
           } else {
             onError(res.message);
@@ -6747,6 +6822,7 @@
     }
 
     function doCalculate() {
+      prewarmBackend_(); // gọi sớm để máy chủ ấm, giảm thời gian chờ khi tính tiền
       const originText = document.getElementById('origin').value.trim();
       const destText = document.getElementById('destination').value.trim();
       const errorBox = document.getElementById('calcError');
