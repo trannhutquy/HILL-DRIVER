@@ -326,28 +326,129 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .regional-weather-map {
-      height: 240px;
+    /* ===== BẢN ĐỒ DỰ BÁO MƯA (ADMIN) ===== */
+    .wx-panel {
+      background: linear-gradient(180deg, #EAF4FE 0%, #E3F2FD 100%);
+      border: 1px solid #D2E7FA;
       border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    body.dark .wx-panel { background: linear-gradient(180deg, #172335 0%, #16202e 100%); border-color: #2c3a4a; }
+    .wx-title-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .wx-title { font-weight: 800; color: #1565C0; font-size: 14.5px; letter-spacing: -.01em; }
+    body.dark .wx-title { color: #90CAF9; }
+    .wx-live-dot {
+      width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+      background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.18);
+      animation: wxPulse 2s ease-in-out infinite;
+    }
+    .wx-live-dot.is-loading { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.20); }
+    .wx-live-dot.is-error { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.18); animation: none; }
+    @keyframes wxPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+    .wx-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; min-height: 22px; }
+    .wx-chip {
+      font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+      background: #fff; border: 1px solid #D2E7FA; color: #1565C0; white-space: nowrap;
+    }
+    .wx-chip.is-rain { background: #E3F2FD; color: #0D47A1; border-color: #BBDEFB; }
+    .wx-chip.is-storm { background: #F3E5F5; color: #6A1B9A; border-color: #E1BEE7; }
+    .wx-chip.is-soon { background: #E0F7FA; color: #006064; border-color: #B2EBF2; }
+    .wx-chip.is-clear { background: #FFF8E1; color: #E65100; border-color: #FFECB3; }
+    .wx-chip.is-time { background: #F1F5F9; color: #475569; border-color: #E2E8F0; }
+    body.dark .wx-chip { background: #221c3d; border-color: #332c50; color: #A5B4FC; }
+    body.dark .wx-chip.is-rain { background: #1e3a5f; border-color: #2C4A73; color: #93C5FD; }
+    body.dark .wx-chip.is-storm { background: #3a1f47; border-color: #5b2d6e; color: #E1BEE7; }
+    body.dark .wx-chip.is-soon { background: #163a3d; border-color: #245a5f; color: #80DEEA; }
+    body.dark .wx-chip.is-clear { background: #3a2a12; border-color: #5c421c; color: #FFCC80; }
+    body.dark .wx-chip.is-time { background: #221c3d; border-color: #332c50; color: #94a3b8; }
+
+    .regional-weather-map {
+      height: 250px;
+      border-radius: 14px;
       overflow: hidden;
       margin-bottom: 10px;
       border: 1px solid #d0d5dd;
       cursor: crosshair;
       touch-action: pan-x pan-y;
+      position: relative;
+      background: #DDEBF7;
     }
-    .weather-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #555; margin-bottom: 6px; }
+    .regional-weather-map.is-loading::after {
+      content: '';
+      position: absolute; inset: 0; z-index: 500; pointer-events: none;
+      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+      background-size: 200% 100%;
+      animation: wxShimmer 1.15s linear infinite;
+    }
+    @keyframes wxShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    /* Vùng màu mềm (blur) tạo cảm giác radar, thay vì các ô vuông cứng */
+    .wx-blob { filter: blur(11px); }
+    .wx-pill { background: transparent; border: none; }
+    .wx-pill-inner {
+      display: flex; align-items: center; gap: 3px;
+      padding: 2px 6px; border-radius: 999px;
+      background: rgba(255,255,255,.93);
+      border: 1px solid rgba(15,23,42,.13);
+      box-shadow: 0 2px 7px rgba(15,23,42,.20);
+      font-size: 11px; font-weight: 800; color: #1e293b; white-space: nowrap;
+    }
+    .wx-pill-inner .wx-pill-emoji { font-size: 12px; line-height: 1; }
+    .wx-pill-inner .wx-pill-prob { font-size: 9.5px; font-weight: 800; color: #1565C0; }
+    body.dark .wx-pill-inner { background: rgba(30,27,75,.93); border-color: rgba(165,180,252,.35); color: #e5e7eb; }
+    body.dark .wx-pill-inner .wx-pill-prob { color: #93C5FD; }
+
+    .wx-timeline { margin: 2px 0 10px; }
+    .wx-timeline-head {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 700; color: #1565C0; margin-bottom: 6px;
+    }
+    body.dark .wx-timeline-head { color: #90CAF9; }
+    .wx-timeline-label { font-weight: 800; color: #0D47A1; background: #fff; border-radius: 8px; padding: 1px 8px; }
+    body.dark .wx-timeline-label { background: #221c3d; color: #A5B4FC; }
+    .wx-slots { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+    .wx-slot {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 5px 2px 4px; border-radius: 10px;
+      border: 1px solid #D2E7FA; background: #fff; color: #334155;
+      cursor: pointer; box-shadow: none; transform: none; min-width: 0;
+      transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .wx-slot:hover { background: #F5FAFF; animation: none; }
+    .wx-slot.active { border-color: #1E88E5; background: #E3F2FD; box-shadow: 0 0 0 2px rgba(30,136,229,.16); }
+    .wx-slot .wx-slot-time { font-size: 10px; font-weight: 700; color: #64748b; }
+    .wx-slot .wx-slot-bar { width: 100%; height: 24px; display: flex; align-items: flex-end; justify-content: center; }
+    .wx-slot .wx-slot-bar i { display: block; width: 9px; border-radius: 4px 4px 2px 2px; background: #93C5FD; min-height: 3px; transition: height .2s ease; }
+    .wx-slot.is-rain .wx-slot-bar i { background: #1E88E5; }
+    .wx-slot.is-storm .wx-slot-bar i { background: #8E24AA; }
+    .wx-slot.is-soon .wx-slot-bar i { background: #38BDF8; }
+    .wx-slot.is-clear .wx-slot-bar i { background: #F59E0B; }
+    .wx-slot .wx-slot-prob { font-size: 9.5px; font-weight: 800; color: #1565C0; }
+    body.dark .wx-slot { background: #221c3d; border-color: #332c50; color: #cbd5e1; }
+    body.dark .wx-slot:hover { background: #2b2545; }
+    body.dark .wx-slot.active { background: #1e3a5f; border-color: #3b82f6; }
+    body.dark .wx-slot .wx-slot-time, body.dark .wx-slot .wx-slot-prob { color: #93C5FD; }
+
+    .weather-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #555; margin-bottom: 6px; }
     .weather-legend span { display: flex; align-items: center; gap: 4px; }
     .weather-legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .wx-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 11.5px; color: #64748b; }
+    .wx-refresh-note { opacity: .9; }
     body.dark .regional-weather-map { border-color: #3e3660; }
     body.dark .weather-legend { color: #aaa; }
+    body.dark .wx-foot { color: #8a99a8; }
 
     /* Màn hình nhỏ (điện thoại): bản đồ thấp hơn, nút xếp gọn hơn, chữ nhỏ lại 1 chút để đỡ chật */
     @media (max-width: 480px) {
       .weather-map-header { justify-content: flex-start; }
       .weather-map-actions { width: 100%; }
       .weather-map-actions .locate-btn { padding: 10px 4px; font-size: 12px; }
-      .regional-weather-map { height: 190px; }
+      .regional-weather-map { height: 230px; }
       .weather-legend { font-size: 11px; gap: 10px; row-gap: 4px; }
+      .wx-slots { grid-template-columns: repeat(7, 46px); overflow-x: auto; padding-bottom: 3px; -webkit-overflow-scrolling: touch; }
+      .wx-summary { gap: 4px; }
+      .wx-chip { font-size: 10.5px; padding: 3px 7px; }
       .leaflet-popup-content { font-size: 12px; }
       /* Ô địa chỉ có 2 nút (Lấy vị trí hiện tại + Khách quen) -> xuống dòng cho khỏi chật */
       .field-with-btn { flex-wrap: wrap; }
@@ -1482,9 +1583,44 @@
       margin-bottom: 16px;
     }
 
-    /* ===== GIAO DIỆN QUẢN TRỊ (ADMIN) - mỗi mục cấu hình là 1 tab, chuyển bằng thanh tab dưới cùng ===== */
+    /* ===== GIAO DIỆN QUẢN TRỊ (ADMIN) ===== */
     #adminGrid .settings-panel { margin-bottom: 0; }
-    #adminShell { padding-bottom: 84px; } /* chừa chỗ cho thanh tab admin cố định phía dưới */
+    #adminShell { padding-bottom: 84px; } /* điện thoại: chừa chỗ cho thanh tab admin cố định phía dưới */
+    .admin-sidebar { display: none; }
+    .admin-main { min-width: 0; }
+    .admin-intro { color: #666; font-size: 14px; margin: 10px 0 18px; }
+
+    /* Thẻ tổng quan nhanh — hiện cả trên điện thoại (2 cột) để ADMIN liếc là biết trạng thái */
+    .admin-kpi-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .admin-kpi {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; text-align: left;
+      padding: 10px 12px; border-radius: 14px;
+      background: #fff; border: 1px solid #e5e9f2;
+      box-shadow: 0 1px 2px rgba(30,27,75,.04);
+      color: #1f2937; font-family: inherit; cursor: pointer;
+      transform: none; transition: background .18s ease, box-shadow .18s ease, transform .18s ease;
+    }
+    .admin-kpi:hover { background: #F8FAFF; transform: translateY(-1px); box-shadow: 0 7px 18px rgba(67,56,202,.10); animation: none; }
+    .admin-kpi:active { transform: scale(.99); }
+    .admin-kpi .kpi-ico {
+      width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #EEF2FF; color: #4338CA; font-size: 15px; font-weight: 800;
+    }
+    .admin-kpi .kpi-ico svg { width: 17px; height: 17px; }
+    .admin-kpi .kpi-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .admin-kpi .kpi-label { font-size: 10.5px; font-weight: 800; color: #6b7280; letter-spacing: .03em; text-transform: uppercase; }
+    .admin-kpi .kpi-value { font-size: 13px; font-weight: 700; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .admin-kpi .kpi-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; flex-shrink: 0; }
+    .admin-kpi.is-on .kpi-dot { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.15); }
+    .admin-kpi.is-scheduled .kpi-dot { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.15); }
+    .admin-kpi.is-off .kpi-dot { background: #94a3b8; }
 
     @media (min-width: 900px) {
       #adminShell {
@@ -1496,6 +1632,84 @@
         border-radius: 0;
       }
     }
+
+    /* ===== LAPTOP / DESKTOP: sidebar trái + vùng nội dung cuộn riêng ===== */
+    @media (min-width: 1024px) {
+      #adminShell {
+        display: grid;
+        grid-template-columns: 252px minmax(0, 1fr);
+        max-width: 1440px;
+        height: 100vh;
+        max-height: 100vh;
+        margin-top: 0;
+        margin-bottom: 0;
+        padding: 0;
+        border-radius: 0;
+        overflow: hidden;
+      }
+      #adminBottomNav { display: none !important; }
+      #adminShell .brand-header { display: none; }
+      #adminShell .topbar { margin-bottom: 4px; }
+      #adminShell .topbar button { display: none; }
+
+      .admin-sidebar {
+        display: flex; flex-direction: column; gap: 6px;
+        height: 100vh; overflow-y: auto;
+        padding: 24px 16px 18px;
+        background: linear-gradient(180deg, #1E1B4B 0%, #312E81 52%, #3730A3 100%);
+        color: #E0E7FF;
+      }
+      .admin-sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; }
+      .admin-sidebar-brand img { width: 34px; height: 34px; border-radius: 10px; background: #fff; padding: 3px; }
+      .admin-sidebar-brand .logo-dark { display: none; }
+      body.dark .admin-sidebar-brand .logo-light { display: none; }
+      body.dark .admin-sidebar-brand .logo-dark { display: block; }
+      .admin-sidebar-title { font-weight: 800; font-size: 15px; letter-spacing: .02em; color: #fff; }
+      .admin-sidebar-sub { font-size: 11.5px; color: #A5B4FC; }
+      .admin-sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
+      .admin-nav-btn {
+        display: flex; align-items: center; gap: 10px;
+        width: 100%; padding: 11px 12px;
+        border: none; border-radius: 12px;
+        background: transparent; color: #C7D2FE;
+        font-family: inherit; font-size: 13.5px; font-weight: 600;
+        text-align: left; cursor: pointer;
+        box-shadow: none; transform: none;
+        transition: background .18s ease, color .18s ease;
+      }
+      .admin-nav-btn:hover { background: rgba(255,255,255,.08); color: #fff; animation: none; }
+      .admin-nav-btn.active { background: rgba(255,255,255,.14); color: #fff; box-shadow: inset 3px 0 0 #A5B4FC; }
+      .admin-nav-btn svg { width: 17px; height: 17px; flex-shrink: 0; }
+      .admin-sidebar-foot { margin-top: auto; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.12); }
+      .admin-sidebar-user { font-size: 12px; color: #C7D2FE; margin-bottom: 8px; word-break: break-word; }
+      .admin-sidebar-user b { color: #fff; }
+      .admin-sidebar-logout {
+        width: 100%; padding: 10px; border-radius: 11px;
+        background: rgba(255,255,255,.10); color: #fff;
+        border: 1px solid rgba(255,255,255,.18);
+        font-family: inherit; font-size: 13px; font-weight: 700;
+        cursor: pointer; box-shadow: none; transform: none;
+      }
+      .admin-sidebar-logout:hover { background: rgba(255,255,255,.18); animation: none; }
+
+      .admin-main { padding: 24px 30px 36px; height: 100vh; overflow-y: auto; }
+      .admin-intro { max-width: 980px; }
+      .admin-kpi-row { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+      #adminGrid .settings-panel { padding: 22px; max-width: 1100px; }
+      .regional-weather-map { height: 400px; }
+      .wx-slots { gap: 7px; }
+      .wx-slot .wx-slot-bar { height: 34px; }
+      .wx-slot .wx-slot-time { font-size: 10.5px; }
+      .wx-slot .wx-slot-prob { font-size: 10.5px; }
+    }
+
+    /* Dark mode cho thẻ tổng quan */
+    body.dark .admin-kpi { background: #221c3d; border-color: #332c50; color: #e5e7eb; }
+    body.dark .admin-kpi:hover { background: #2b2545; }
+    body.dark .admin-kpi .kpi-ico { background: #2b2545; color: #A5B4FC; }
+    body.dark .admin-kpi .kpi-label { color: #8a99a8; }
+    body.dark .admin-kpi .kpi-value { color: #e5e7eb; }
+    body.dark .admin-intro { color: #aab2bd; }
 
     .history-list { max-height: 320px; overflow-y: auto; }
     .history-item {
@@ -2363,18 +2577,85 @@
 
   <!-- ================= ADMIN SHELL (chỉ hiện khi đăng nhập bằng tài khoản ADMIN) ================= -->
   <div class="card hidden" id="adminShell">
-    <div class="brand-header"><img class="brand-logo logo-light" src="assets/logo-light.png" alt="Hill Drivell"><img class="brand-logo logo-dark" src="assets/logo-dark.png" alt="Hill Drivell"></div>
-    <div class="topbar">
-      <span class="topbar-brand">Quản trị hệ thống — <b id="adminUserName"></b></span>
-      <button type="button" onclick="doLogout()" style="width:auto;padding:6px 14px;">Đăng xuất</button>
-    </div>
-    <p style="color:#666;font-size:14px;margin:10px 0 18px;">
-      Khi bạn <b>Khoá áp dụng</b> một mục dưới đây với khoảng ngày cụ thể, giá trị đó sẽ được
-      dùng chung cho <b>toàn bộ tài khoản</b> trong hệ thống trong đúng khoảng ngày đó, và các
-      tài khoản khác sẽ <b>không thể tự chỉnh sửa</b> mục này cho tới khi hết hạn hoặc bạn gỡ khoá.
-    </p>
+    <!-- Sidebar: chỉ hiện trên laptop/desktop. Điện thoại vẫn dùng thanh tab dưới cùng. -->
+    <aside class="admin-sidebar" aria-label="Điều hướng quản trị">
+      <div class="admin-sidebar-brand">
+        <img class="logo-light" src="assets/logo-icon-light.png" alt="Hill Driver">
+        <img class="logo-dark" src="assets/logo-icon-dark.png" alt="Hill Driver">
+        <div>
+          <div class="admin-sidebar-title">Hill Driver</div>
+          <div class="admin-sidebar-sub">Bảng điều khiển</div>
+        </div>
+      </div>
+      <nav class="admin-sidebar-nav">
+        <button type="button" class="admin-nav-btn active" data-tab="adminTabPriceTiers" onclick="switchAdminTab('adminTabPriceTiers')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="m3 13 9 5 9-5"/></svg><span>Giá luỹ kế</span>
+        </button>
+        <button type="button" class="admin-nav-btn" data-tab="adminTabTimeSurcharges" onclick="switchAdminTab('adminTabTimeSurcharges')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Phụ thu giờ</span>
+        </button>
+        <button type="button" class="admin-nav-btn" data-tab="adminTabRainSurcharge" onclick="switchAdminTab('adminTabRainSurcharge')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16a4 4 0 0 1 .6-8 5.5 5.5 0 0 1 10.6 1.6A3.5 3.5 0 0 1 18 16"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg><span>Phụ thu mưa</span>
+        </button>
+        <button type="button" class="admin-nav-btn" data-tab="adminTabRounding" onclick="switchAdminTab('adminTabRounding')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h3M13 12h3M8 17h3M13 17h3"/></svg><span>Làm tròn tiền</span>
+        </button>
+        <button type="button" class="admin-nav-btn" data-tab="adminTabHistory" onclick="switchAdminTab('adminTabHistory')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg><span>Lịch sử shipper</span>
+        </button>
+      </nav>
+      <div class="admin-sidebar-foot">
+        <div class="admin-sidebar-user">Đăng nhập: <b id="adminSidebarUserName"></b></div>
+        <button type="button" class="admin-sidebar-logout" onclick="doLogout()">Đăng xuất</button>
+      </div>
+    </aside>
 
-    <div id="adminGrid">
+    <div class="admin-main">
+      <div class="brand-header"><img class="brand-logo logo-light" src="assets/logo-light.png" alt="Hill Drivell"><img class="brand-logo logo-dark" src="assets/logo-dark.png" alt="Hill Drivell"></div>
+      <div class="topbar">
+        <span class="topbar-brand">Quản trị hệ thống — <b id="adminUserName"></b></span>
+        <button type="button" onclick="doLogout()" style="width:auto;padding:6px 14px;">Đăng xuất</button>
+      </div>
+      <p class="admin-intro">
+        Khi bạn <b>Khoá áp dụng</b> một mục dưới đây với khoảng ngày cụ thể, giá trị đó sẽ được
+        dùng chung cho <b>toàn bộ tài khoản</b> trong hệ thống trong đúng khoảng ngày đó, và các
+        tài khoản khác sẽ <b>không thể tự chỉnh sửa</b> mục này cho tới khi hết hạn hoặc bạn gỡ khoá.
+      </p>
+
+      <!-- Thẻ tổng quan nhanh: bấm vào để mở đúng mục cấu hình -->
+      <div class="admin-kpi-row" id="adminKpiRow">
+        <button type="button" class="admin-kpi" onclick="switchAdminTab('adminTabPriceTiers')" title="Mở cấu hình giá luỹ kế">
+          <span class="kpi-ico">₫</span>
+          <span class="kpi-body"><span class="kpi-label">Giá luỹ kế</span><span class="kpi-value" id="adminKpiPriceTiers">Đang tải…</span></span>
+          <span class="kpi-dot" id="adminKpiDotPriceTiers"></span>
+        </button>
+        <button type="button" class="admin-kpi" onclick="switchAdminTab('adminTabTimeSurcharges')" title="Mở cấu hình phụ thu theo giờ">
+          <span class="kpi-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </span>
+          <span class="kpi-body"><span class="kpi-label">Phụ thu giờ</span><span class="kpi-value" id="adminKpiTimeSurcharges">Đang tải…</span></span>
+          <span class="kpi-dot" id="adminKpiDotTimeSurcharges"></span>
+        </button>
+        <button type="button" class="admin-kpi" onclick="switchAdminTab('adminTabRainSurcharge')" title="Mở cấu hình phụ thu mưa">
+          <span class="kpi-ico">☂</span>
+          <span class="kpi-body"><span class="kpi-label">Phụ thu mưa</span><span class="kpi-value" id="adminKpiRainSurcharge">Đang tải…</span></span>
+          <span class="kpi-dot" id="adminKpiDotRainSurcharge"></span>
+        </button>
+        <button type="button" class="admin-kpi" onclick="switchAdminTab('adminTabRounding')" title="Mở cấu hình làm tròn tiền">
+          <span class="kpi-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h3M13 12h3M8 17h3M13 17h3"/></svg>
+          </span>
+          <span class="kpi-body"><span class="kpi-label">Làm tròn tiền</span><span class="kpi-value" id="adminKpiRounding">Đang tải…</span></span>
+          <span class="kpi-dot" id="adminKpiDotRounding"></span>
+        </button>
+        <button type="button" class="admin-kpi" onclick="switchAdminTab('adminTabRainSurcharge')" title="Mở bản đồ dự báo mưa">
+          <span class="kpi-ico">🗺</span>
+          <span class="kpi-body"><span class="kpi-label">Thời tiết khu vực</span><span class="kpi-value" id="adminKpiWeather">Đang tải…</span></span>
+          <span class="kpi-dot" id="adminKpiDotWeather"></span>
+        </button>
+      </div>
+
+      <div id="adminGrid">
     <!-- Mốc giá luỹ kế -->
     <div class="tab-content active" id="adminTabPriceTiers">
     <div class="settings-panel" style="margin-bottom:14px;">
@@ -2445,24 +2726,40 @@
     <div class="settings-panel" style="margin-bottom:14px;">
       <h3>Phụ thu tự động khi trời mưa</h3>
 
-      <!-- Bản đồ thời tiết khu vực: giúp ADMIN nhìn nhanh khu vực nào đang mưa trước khi ép chế độ -->
-      <div style="background:#E3F2FD;border-radius:10px;padding:14px;margin-bottom:16px;">
+      <!-- Bản đồ dự báo mưa khu vực: giúp ADMIN nhìn nhanh khu vực nào đang/sắp mưa trước khi ép chế độ -->
+      <div class="wx-panel">
         <div class="weather-map-header">
-          <span style="font-weight:700;color:#1565C0;">Bản đồ thời tiết khu vực</span>
+          <div class="wx-title-wrap">
+            <span class="wx-live-dot" id="regionalWeatherLiveDot" title="Đang cập nhật"></span>
+            <span class="wx-title">Bản đồ dự báo mưa</span>
+          </div>
           <div class="weather-map-actions">
             <button type="button" class="locate-btn" onclick="locateRegionalWeatherMap()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-2px"><path d="M12 21s-6.5-6.1-6.5-11A6.5 6.5 0 0 1 18.5 10c0 4.9-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.2"/></svg> Vị trí của tôi</button>
             <button type="button" class="locate-btn" onclick="refreshRegionalWeatherMap()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-2px"><path d="M3.5 12a8.5 8.5 0 0 1 14.6-5.9L20 8"/><polyline points="20 3 20 8 15 8"/><path d="M20.5 12a8.5 8.5 0 0 1-14.6 5.9L4 16"/><polyline points="4 21 4 16 9 16"/></svg> Làm mới</button>
           </div>
         </div>
-        <div class="hint" style="margin-top:0;">Chia khu vực đang xem thành lưới 9 vùng, mỗi vùng tô màu theo thời tiết thời gian thực (Open-Meteo). Bấm vào 1 vùng để xem nhiệt độ chi tiết, hoặc bấm vào chỗ khác trên bản đồ để chuyển sang xem khu vực đó. Dựa vào màu vùng để quyết định bấm Tự động / Ép BẬT / Ép TẮT bên dưới.</div>
-        <div class="regional-weather-map" id="regionalWeatherMap"></div>
-        <div class="weather-legend">
-          <span><span class="dot" style="background:#1E88E5;"></span>Vùng đang mưa</span>
-          <span><span class="dot" style="background:#8E24AA;"></span>Vùng dông/mưa to</span>
-          <span><span class="dot" style="background:#90A4AE;"></span>Vùng nhiều mây</span>
-          <span><span class="dot" style="background:#FB8C00;"></span>Vùng quang/nắng</span>
+        <div class="wx-summary" id="regionalWeatherSummary">
+          <span class="wx-chip">Đang tải dữ liệu thời tiết…</span>
         </div>
-        <div style="font-size:12px;color:#777;" id="regionalWeatherUpdated"></div>
+        <div class="regional-weather-map" id="regionalWeatherMap"></div>
+        <div class="wx-timeline hidden" id="regionalWeatherTimeline">
+          <div class="wx-timeline-head">
+            <span>Dự báo mưa 90 phút tới</span>
+            <span class="wx-timeline-label" id="regionalWeatherTimelineLabel">Bây giờ</span>
+          </div>
+          <div class="wx-slots" id="regionalWeatherSlots"></div>
+        </div>
+        <div class="weather-legend">
+          <span><span class="dot" style="background:#8E24AA;"></span>Dông/mưa to</span>
+          <span><span class="dot" style="background:#1E88E5;"></span>Đang mưa</span>
+          <span><span class="dot" style="background:#38BDF8;"></span>Sắp mưa</span>
+          <span><span class="dot" style="background:#90A4AE;"></span>Nhiều mây</span>
+          <span><span class="dot" style="background:#FB8C00;"></span>Quang/nắng</span>
+        </div>
+        <div class="wx-foot">
+          <span id="regionalWeatherUpdated"></span>
+          <span class="wx-refresh-note">Tự làm mới mỗi 5 phút · bấm bản đồ để đổi khu vực</span>
+        </div>
         <div class="error hidden" id="regionalWeatherError" style="margin-bottom:0;"></div>
       </div>
 
@@ -2559,6 +2856,7 @@
     </div>
     </div>
     </div>
+    </div><!-- /.admin-main -->
   </div>
 
   <div id="adminBottomNav" class="hidden">
@@ -3265,7 +3563,7 @@
     const ONBOARD_KEY = 'taxiapp_onboarded';
     // Phiên bản app hiển thị ở tab Cài đặt. Mỗi lần phát hành bản mới, tăng số này
     // ĐỒNG THỜI với VERSION trong sw.js để người dùng nhận được bản cập nhật.
-    const APP_VERSION = 'v10';
+    const APP_VERSION = 'v11';
     const fieldCoords = { origin: null, destination: null };
     let mapPicker = null;          // instance bản đồ Leaflet dùng riêng cho modal chọn vị trí
     let mapPickerWhich = null;     // 'origin' hoặc 'destination' đang được chọn
@@ -3464,6 +3762,8 @@
         document.getElementById('adminShell').classList.remove('hidden');
         document.getElementById('adminBottomNav').classList.remove('hidden');
         document.getElementById('adminUserName').textContent = fullName;
+        const sidebarUser = document.getElementById('adminSidebarUserName');
+        if (sidebarUser) sidebarUser.textContent = fullName;
         loadAdminOverview();
         return;
       }
@@ -3547,16 +3847,43 @@
 
     function renderAdminLockStatus(key, item) {
       const el = document.getElementById('adminStatus_' + key);
-      if (!el) return;
+      let text, color, kpiShort, kpiState;
       if (item && item.locked && item.active) {
-        el.textContent = 'Đang khoá áp dụng chung, từ ' + item.fromDate + ' đến ' + item.toDate + '.';
-        el.style.color = '#2e7d32';
+        text = 'Đang khoá áp dụng chung, từ ' + item.fromDate + ' đến ' + item.toDate + '.';
+        color = '#2e7d32';
+        kpiShort = 'Đang áp dụng chung';
+        kpiState = 'is-on';
       } else if (item && item.locked) {
-        el.textContent = 'Đã đặt khoá (' + item.fromDate + ' → ' + item.toDate + ') nhưng chưa/không còn hiệu lực hôm nay.';
-        el.style.color = '#0D47A1';
+        text = 'Đã đặt khoá (' + item.fromDate + ' → ' + item.toDate + ') nhưng chưa/không còn hiệu lực hôm nay.';
+        color = '#0D47A1';
+        kpiShort = 'Đã hẹn khoá';
+        kpiState = 'is-scheduled';
       } else {
-        el.textContent = 'Chưa khoá — mỗi tài khoản đang tự chỉnh cấu hình riêng.';
-        el.style.color = '#666';
+        text = 'Chưa khoá — mỗi tài khoản đang tự chỉnh cấu hình riêng.';
+        color = '#666';
+        kpiShort = 'Tự do';
+        kpiState = 'is-off';
+      }
+
+      if (el) {
+        el.textContent = text;
+        el.style.color = color;
+      }
+
+      // Đồng bộ thẻ tổng quan nhanh (KPI) ở đầu trang
+      const kpiEl = document.getElementById('adminKpi' + key);
+      if (kpiEl) {
+        const card = kpiEl.closest('.admin-kpi');
+        if (card) {
+          card.classList.remove('is-on', 'is-scheduled', 'is-off');
+          card.classList.add(kpiState);
+        }
+        // Riêng "Phụ thu mưa": giá trị hiển thị chế độ Tự động/Ép BẬT/Ép TẮT,
+        // nên chỉ đổi màu chấm trạng thái khoá, không ghi đè chữ.
+        if (key !== 'RainSurcharge') {
+          kpiEl.textContent = kpiShort;
+          card.title = text + ' (bấm để mở)';
+        }
       }
     }
 
@@ -3581,6 +3908,13 @@
         const btn = document.getElementById('rainModeBtn_' + m);
         if (btn) btn.classList.toggle('active', state.mode === m);
       });
+      // Thẻ tổng quan: hiện chế độ đang áp dụng cho toàn hệ thống
+      const kpiEl = document.getElementById('adminKpiRainSurcharge');
+      if (kpiEl) {
+        kpiEl.textContent = state.mode === 'on' ? 'Ép BẬT toàn hệ thống' : (state.mode === 'off' ? 'Ép TẮT toàn hệ thống' : 'Tự động theo thời tiết');
+        const card = kpiEl.closest('.admin-kpi');
+        if (card) card.title = 'Chế độ phụ thu mưa: ' + kpiEl.textContent + ' (bấm để mở)';
+      }
       if (!statusEl) return;
       if (state.mode === 'on') {
         statusEl.style.color = '#2e7d32';
@@ -3645,6 +3979,17 @@
       const btnOn = document.getElementById('roundingForceModeBtn_on');
       if (btnOff) btnOff.classList.toggle('active', !state.forced);
       if (btnOn) btnOn.classList.toggle('active', !!state.forced);
+      // Thẻ tổng quan nhanh
+      const kpiEl = document.getElementById('adminKpiRounding');
+      if (kpiEl) {
+        kpiEl.textContent = state.forced ? 'Ép bật toàn hệ thống' : 'Shipper tự chọn';
+        const card = kpiEl.closest('.admin-kpi');
+        if (card) {
+          card.classList.remove('is-on', 'is-scheduled', 'is-off');
+          card.classList.add(state.forced ? 'is-on' : 'is-off');
+          card.title = (state.forced ? 'Đang ép bật làm tròn cho toàn bộ shipper' : 'Mỗi shipper tự chọn mức làm tròn') + ' (bấm để mở)';
+        }
+      }
       if (!statusEl) return;
       if (state.forced) {
         statusEl.style.color = '#2e7d32';
@@ -3865,11 +4210,21 @@
         .getHistoryForAdmin(currentUser.username, username);
     }
 
-    // ---- Bản đồ thời tiết khu vực (ADMIN) ----
+    // ---- Bản đồ dự báo mưa khu vực (ADMIN) ----
     let regionalWeatherMap = null;
     let regionalWeatherMarkers = [];
     let regionalWeatherCenterMarker = null;
     let regionalWeatherCenter = { lat: 10.4938, lng: 105.7628 }; // trung tâm mặc định khi chưa xác định vị trí
+    let regionalWeatherData = null;          // dữ liệu lần tải gần nhất (9 điểm + dự báo 15 phút)
+    let regionalWeatherSlotIndex = 0;        // 0 = bây giờ, 1..6 = các mốc 15 phút tiếp theo
+    let regionalWeatherLastFetch_ = 0;       // thời điểm tải thành công gần nhất
+
+    // Mã WMO dùng để phân loại màu trên bản đồ
+    const WX_RAIN_CODES_ = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99];
+    const WX_STORM_CODES_ = [95, 96, 99];
+    const WX_CLOUD_CODES_ = [2, 3, 45, 48];
+    const WX_CATEGORY_LABEL_ = { storm: 'Dông/mưa to', rain: 'Đang mưa', soon: 'Sắp mưa', cloud: 'Nhiều mây', sun: 'Quang/nắng' };
+    const WX_CATEGORY_EMOJI_ = { storm: '⛈', rain: '🌧', soon: '🌦', cloud: '☁', sun: '☀' };
 
     // Lớp nền bản đồ dùng chung: ưu tiên OpenStreetMap; nếu mạng (nhất là 4G)
     // không tải được ô bản đồ từ OSM (DNS nhà mạng đôi khi không phân giải được
@@ -3916,7 +4271,16 @@
         addBaseTiles_(regionalWeatherMap, 18);
         regionalWeatherMap.on('click', function(e) {
           regionalWeatherCenter = { lat: e.latlng.lat, lng: e.latlng.lng };
+          regionalWeatherSlotIndex = 0; // đổi khu vực -> quay về "Bây giờ"
           fetchRegionalWeather();
+        });
+
+        // Quay lại tab trình duyệt sau một lúc -> tự cập nhật nếu dữ liệu đã cũ
+        document.addEventListener('visibilitychange', function() {
+          if (document.visibilityState === 'visible' && regionalWeatherMap &&
+              regionalWeatherLastFetch_ && (Date.now() - regionalWeatherLastFetch_) > 5 * 60 * 1000) {
+            fetchRegionalWeather();
+          }
         });
 
         // Điện thoại xoay ngang/dọc hay đổi kích thước cửa sổ -> vẽ lại đúng khung, tránh bản đồ bị vỡ layout
@@ -3930,7 +4294,7 @@
     }
 
     let regionalWeatherAutoRefreshTimer = null;
-    const REGIONAL_WEATHER_AUTO_REFRESH_MS = 10 * 60 * 1000; // 10 phút/lần
+    const REGIONAL_WEATHER_AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 phút/lần (nowcast 15 phút nên cần tươi)
 
     function startRegionalWeatherAutoRefresh() {
       stopRegionalWeatherAutoRefresh(); // tránh chạy trùng nhiều interval nếu gọi lại nhiều lần
@@ -3970,13 +4334,22 @@
     function fetchRegionalWeather() {
       const errorBox = document.getElementById('regionalWeatherError');
       const updatedEl = document.getElementById('regionalWeatherUpdated');
+      const mapEl = document.getElementById('regionalWeatherMap');
+      const liveDot = document.getElementById('regionalWeatherLiveDot');
       errorBox.classList.add('hidden');
       errorBox.textContent = '';
+      if (mapEl) mapEl.classList.add('is-loading');
+      if (liveDot) { liveDot.classList.remove('is-error'); liveDot.classList.add('is-loading'); }
       updatedEl.textContent = 'Đang tải dữ liệu thời tiết...';
 
       google.script.run
-        .withSuccessHandler(renderRegionalWeatherMap_)
+        .withSuccessHandler(function(res) {
+          if (mapEl) mapEl.classList.remove('is-loading');
+          renderRegionalWeatherMap_(res);
+        })
         .withFailureHandler(function(err) {
+          if (mapEl) mapEl.classList.remove('is-loading');
+          if (liveDot) { liveDot.classList.remove('is-loading'); liveDot.classList.add('is-error'); }
           errorBox.classList.remove('hidden');
           errorBox.style.color = '#d32f2f';
           errorBox.textContent = 'Lỗi hệ thống: ' + err.message;
@@ -3988,14 +4361,212 @@
     function regionalWeatherColor_(category) {
       if (category === 'storm') return '#8E24AA';
       if (category === 'rain') return '#1E88E5';
+      if (category === 'soon') return '#38BDF8';
       if (category === 'cloud') return '#90A4AE';
       return '#FB8C00';
+    }
+
+    function regionalWeatherSlot_(p, idx) {
+      if (!p || !p.slots || !p.slots.length) return null;
+      return p.slots[Math.min(idx, p.slots.length - 1)] || null;
+    }
+
+    function regionalWeatherSlotCategory_(p, idx) {
+      // Mốc "Bây giờ" dùng luôn kết quả server đã gộp nowcast + độ mây cho chính xác
+      if (idx === 0 && p.category) return p.category;
+      const slot = regionalWeatherSlot_(p, idx);
+      if (!slot) return p.category || 'sun';
+      const code = Number(slot.code);
+      const pr = Number(slot.pr) || 0;
+      const amount = Number(slot.p) || 0;
+      if (WX_STORM_CODES_.indexOf(code) !== -1) return 'storm';
+      const rainByCode = WX_RAIN_CODES_.indexOf(code) !== -1;
+      if (rainByCode || amount >= 0.2 || (amount >= 0.1 && pr >= 50)) return 'rain';
+      if ((rainByCode && pr >= 40) || (amount >= 0.2 && pr >= 50) || (amount >= 0.1 && pr >= 70)) return 'soon';
+      if (WX_CLOUD_CODES_.indexOf(code) !== -1) return 'cloud';
+      return 'sun';
+    }
+
+    function regionalWeatherSlotProbability_(p, idx) {
+      const slot = regionalWeatherSlot_(p, idx);
+      return slot ? (Number(slot.pr) || 0) : 0;
+    }
+
+    function regionalWeatherWorst_(cats) {
+      if (cats.indexOf('storm') !== -1) return 'storm';
+      if (cats.indexOf('rain') !== -1) return 'rain';
+      if (cats.indexOf('soon') !== -1) return 'soon';
+      if (cats.indexOf('cloud') !== -1) return 'cloud';
+      return 'sun';
+    }
+
+    // Cho biết mưa đang tập trung ở hướng nào so với tâm bản đồ (Bắc/Đông/Nam/Tây...)
+    function regionalWeatherDirection_(data, cats) {
+      let dx = 0, dy = 0, n = 0;
+      const cosLat = Math.cos((data.centerLat || 0) * Math.PI / 180);
+      (data.points || []).forEach(function(p, i) {
+        if (cats[i] !== 'rain' && cats[i] !== 'storm') return;
+        dx += (p.lng - data.centerLng) * cosLat;
+        dy += (p.lat - data.centerLat);
+        n++;
+      });
+      if (!n) return '';
+      const angle = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+      const dirs = ['Bắc', 'Đông Bắc', 'Đông', 'Đông Nam', 'Nam', 'Tây Nam', 'Tây', 'Tây Bắc'];
+      return 'Mưa tập trung phía ' + dirs[Math.round(angle / 45) % 8];
+    }
+
+    function regionalWeatherTimeLabel_(iso) {
+      if (!iso) return '';
+      const m = String(iso).match(/T(\d{2}:\d{2})/);
+      return m ? m[1] : String(iso);
+    }
+
+    function regionalWeatherSlotTime_(data, idx) {
+      const times = (data && data.slotTimes) || [];
+      return times[idx] ? regionalWeatherTimeLabel_(times[idx]) : '';
+    }
+
+    function selectRegionalWeatherSlot_(idx) {
+      regionalWeatherSlotIndex = idx;
+      if (!regionalWeatherData) return;
+      paintRegionalWeather_();
+    }
+
+    function paintRegionalWeather_() {
+      const data = regionalWeatherData;
+      if (!data || !regionalWeatherMap) return;
+      const idx = regionalWeatherSlotIndex || 0;
+
+      regionalWeatherMarkers.forEach(function(m) { regionalWeatherMap.removeLayer(m); });
+      regionalWeatherMarkers = [];
+
+      const stepLat = data.stepLat || 0.16;
+      // Bán kính vùng màu: hơi lớn hơn nửa ô lưới để các vùng hoà vào nhau thành "radar" mềm
+      const radiusMeters = Math.max(6000, stepLat * 111320 * 0.62);
+      const points = data.points || [];
+      const cats = points.map(function(p) { return regionalWeatherSlotCategory_(p, idx); });
+
+      points.forEach(function(p, i) {
+        const category = cats[i];
+        const zoneColor = regionalWeatherColor_(category);
+
+        // Vùng màu mềm (blur) thay cho ô vuông cứng -> nhìn như radar thời tiết
+        const blob = L.circle([p.lat, p.lng], {
+          radius: radiusMeters,
+          stroke: false,
+          fillColor: zoneColor,
+          fillOpacity: category === 'sun' ? 0.26 : (category === 'cloud' ? 0.34 : 0.48),
+          interactive: false,
+          className: 'wx-blob'
+        }).addTo(regionalWeatherMap);
+        regionalWeatherMarkers.push(blob);
+
+        // Nhãn nhỏ tại mỗi điểm: biểu tượng + nhiệt độ + xác suất mưa
+        const prob = regionalWeatherSlotProbability_(p, idx);
+        const isNight = (p.isDay === 0 || p.isDay === '0');
+        const emoji = (category === 'sun' && isNight) ? '🌙' : (WX_CATEGORY_EMOJI_[category] || '•');
+        const tempTxt = (p.tempC !== null && p.tempC !== undefined) ? (p.tempC + '°') : '';
+        const probTxt = prob >= 30 ? '<span class="wx-pill-prob">' + prob + '%</span>' : '';
+        const html = '<span class="wx-pill-inner"><span class="wx-pill-emoji">' + emoji + '</span>' +
+          (tempTxt ? '<span>' + tempTxt + '</span>' : '') + probTxt + '</span>';
+        const icon = L.divIcon({ className: 'wx-pill', html: html, iconSize: null, iconAnchor: [20, 12] });
+        const marker = L.marker([p.lat, p.lng], { icon: icon, keyboard: false }).addTo(regionalWeatherMap);
+
+        const when = idx === 0 ? 'Bây giờ' : ('Dự báo ' + (regionalWeatherSlotTime_(data, idx) || ('+' + idx * 15 + '′')));
+        const popup =
+          '<div class="wx-popup">' +
+            '<b>' + (WX_CATEGORY_LABEL_[category] || 'Không rõ') + '</b><br>' +
+            '<span style="color:#64748b;font-size:11.5px;">' + when + '</span><br>' +
+            (p.tempC !== null && p.tempC !== undefined ? ('Nhiệt độ: <b>' + p.tempC + '°C</b><br>') : '') +
+            (prob ? ('Khả năng mưa: <b>' + prob + '%</b><br>') : '') +
+            (p.rainSoonMin ? ('Sắp mưa trong ~' + p.rainSoonMin + ' phút<br>') : '') +
+            '<span style="color:#94a3b8;font-size:11px;">' + p.lat.toFixed(3) + ', ' + p.lng.toFixed(3) + '</span>' +
+          '</div>';
+        marker.bindPopup(popup, { closeButton: false });
+        marker.on('mouseover', function() { marker.openPopup(); });
+        regionalWeatherMarkers.push(marker);
+      });
+
+      const centerMarker = L.circleMarker([data.centerLat, data.centerLng], {
+        radius: 6, color: '#1565C0', weight: 2, fillColor: '#fff', fillOpacity: 1
+      }).addTo(regionalWeatherMap);
+      centerMarker.bindTooltip('Trung tâm đang xem', { direction: 'top' });
+      regionalWeatherMarkers.push(centerMarker);
+
+      updateRegionalWeatherSummary_(data, idx, cats);
+      updateRegionalWeatherTimelineActive_(idx);
+    }
+
+    function updateRegionalWeatherSummary_(data, idx, cats) {
+      const el = document.getElementById('regionalWeatherSummary');
+      if (!el) return;
+      const counts = { storm: 0, rain: 0, soon: 0, cloud: 0, sun: 0 };
+      cats.forEach(function(c) { counts[c] = (counts[c] || 0) + 1; });
+      const total = cats.length || 1;
+      const chips = [];
+      if (counts.storm) chips.push('<span class="wx-chip is-storm">⛈ Dông ' + counts.storm + '</span>');
+      if (counts.rain) chips.push('<span class="wx-chip is-rain">🌧 Mưa ' + counts.rain + '/' + total + '</span>');
+      if (counts.soon) chips.push('<span class="wx-chip is-soon">🌦 Sắp mưa ' + counts.soon + '</span>');
+      if (counts.cloud) chips.push('<span class="wx-chip">☁ Nhiều mây ' + counts.cloud + '</span>');
+      if (counts.sun) chips.push('<span class="wx-chip is-clear">☀ Quang ' + counts.sun + '</span>');
+      const when = idx === 0 ? 'Bây giờ' : ('Dự báo ' + (regionalWeatherSlotTime_(data, idx) || ('+' + idx * 15 + '′')));
+      chips.push('<span class="wx-chip is-time">🕒 ' + when + '</span>');
+      const dir = regionalWeatherDirection_(data, cats);
+      if (dir) chips.push('<span class="wx-chip is-rain">🧭 ' + dir + '</span>');
+      el.innerHTML = chips.join('');
+    }
+
+    function buildRegionalWeatherTimeline_(data) {
+      const timeline = document.getElementById('regionalWeatherTimeline');
+      const slotsEl = document.getElementById('regionalWeatherSlots');
+      if (!timeline || !slotsEl) return;
+      const first = data.points && data.points[0];
+      const slotCount = (first && first.slots && first.slots.length) ? first.slots.length : 0;
+      if (!slotCount) { timeline.classList.add('hidden'); slotsEl.innerHTML = ''; return; }
+
+      const timesCount = (data.slotTimes && data.slotTimes.length) ? data.slotTimes.length : slotCount;
+      const count = Math.min(7, slotCount, timesCount);
+      let html = '';
+      for (let i = 0; i < count; i++) {
+        const cats = (data.points || []).map(function(p) { return regionalWeatherSlotCategory_(p, i); });
+        const worst = regionalWeatherWorst_(cats);
+        let prob = 0;
+        (data.points || []).forEach(function(p) { prob = Math.max(prob, regionalWeatherSlotProbability_(p, i)); });
+        const barH = Math.max(3, Math.round(prob * 0.30));
+        const label = i === 0 ? 'Nay' : (regionalWeatherSlotTime_(data, i) || ('+' + i * 15 + '′'));
+        html += '<button type="button" class="wx-slot is-' + worst + (i === regionalWeatherSlotIndex ? ' active' : '') +
+          '" onclick="selectRegionalWeatherSlot_(' + i + ')" title="' + (WX_CATEGORY_LABEL_[worst] || '') + ' · ' + prob + '%">' +
+          '<span class="wx-slot-time">' + label + '</span>' +
+          '<span class="wx-slot-bar"><i style="height:' + barH + 'px;"></i></span>' +
+          '<span class="wx-slot-prob">' + prob + '%</span>' +
+        '</button>';
+      }
+      slotsEl.innerHTML = html;
+      timeline.classList.remove('hidden');
+    }
+
+    function updateRegionalWeatherTimelineActive_(idx) {
+      const slotsEl = document.getElementById('regionalWeatherSlots');
+      const labelEl = document.getElementById('regionalWeatherTimelineLabel');
+      if (slotsEl) {
+        Array.prototype.forEach.call(slotsEl.querySelectorAll('.wx-slot'), function(btn, i) {
+          btn.classList.toggle('active', i === idx);
+        });
+      }
+      if (labelEl && regionalWeatherData) {
+        labelEl.textContent = idx === 0
+          ? 'Bây giờ'
+          : ('Dự báo lúc ' + (regionalWeatherSlotTime_(regionalWeatherData, idx) || ('+' + idx * 15 + ' phút')));
+      }
     }
 
     function renderRegionalWeatherMap_(res) {
       const errorBox = document.getElementById('regionalWeatherError');
       const updatedEl = document.getElementById('regionalWeatherUpdated');
+      const liveDot = document.getElementById('regionalWeatherLiveDot');
       if (!res || !res.success) {
+        if (liveDot) { liveDot.classList.remove('is-loading'); liveDot.classList.add('is-error'); }
         errorBox.classList.remove('hidden');
         errorBox.style.color = '#d32f2f';
         errorBox.textContent = (res && res.message) || 'Không tải được bản đồ thời tiết.';
@@ -4003,46 +4574,28 @@
         return;
       }
 
-      regionalWeatherMarkers.forEach(function(m) { regionalWeatherMap.removeLayer(m); });
-      regionalWeatherMarkers = [];
+      regionalWeatherData = res;
+      regionalWeatherSlotIndex = 0;
+      regionalWeatherLastFetch_ = Date.now();
+      if (liveDot) { liveDot.classList.remove('is-loading', 'is-error'); }
 
-      // Vẽ mỗi điểm thành 1 Ô VÙNG (rectangle) kích thước bằng ô lưới, các ô nằm sát nhau
-      // tạo thành mảng màu liền kề phủ kín khu vực -> dễ nhìn "vùng nào màu gì" hơn là chấm rời rạc.
-      const halfLat = (res.stepLat || 0.16) / 2;
-      const halfLng = (res.stepLng || 0.16) / 2;
-      const labelMap = { storm: 'Dông/mưa to', rain: 'Đang mưa', cloud: 'Nhiều mây', sun: 'Quang/nắng' };
+      buildRegionalWeatherTimeline_(res);
+      paintRegionalWeather_();
 
-      (res.points || []).forEach(function(p) {
-        const bounds = [
-          [p.lat - halfLat, p.lng - halfLng],
-          [p.lat + halfLat, p.lng + halfLng]
-        ];
-        const zoneColor = regionalWeatherColor_(p.category);
-        const zone = L.rectangle(bounds, {
-          color: zoneColor,
-          weight: 1,
-          opacity: 0.9,
-          fillColor: zoneColor,
-          fillOpacity: 0.42
-        }).addTo(regionalWeatherMap);
-        zone.bindPopup(
-          '<b>' + (labelMap[p.category] || 'Không rõ') + '</b><br>' +
-          (p.tempC !== null ? p.tempC + '°C<br>' : '') +
-          p.lat.toFixed(3) + ', ' + p.lng.toFixed(3)
-        );
-        zone.on('mouseover', function() { zone.setStyle({ fillOpacity: 0.65 }); });
-        zone.on('mouseout', function() { zone.setStyle({ fillOpacity: 0.42 }); });
-        regionalWeatherMarkers.push(zone);
-      });
-
-      const centerMarker = L.circleMarker([res.centerLat, res.centerLng], {
-        radius: 5, color: '#1565C0', weight: 2, fillColor: '#fff', fillOpacity: 1
-      }).addTo(regionalWeatherMap);
-      centerMarker.bindTooltip('Trung tâm đang xem', { direction: 'top' });
-      regionalWeatherMarkers.push(centerMarker);
+      // Cập nhật thẻ tổng quan "Thời tiết khu vực"
+      const kpiEl = document.getElementById('adminKpiWeather');
+      if (kpiEl) {
+        kpiEl.textContent = res.rainingCount + '/' + res.totalPoints + ' điểm đang mưa';
+        const card = kpiEl.closest('.admin-kpi');
+        if (card) {
+          card.classList.remove('is-on', 'is-scheduled', 'is-off');
+          card.classList.add(res.rainingCount > 0 ? 'is-on' : 'is-off');
+          card.title = 'Cập nhật lúc ' + res.updatedAt + ' (bấm để mở bản đồ)';
+        }
+      }
 
       errorBox.classList.add('hidden');
-      updatedEl.textContent = 'Cập nhật lúc ' + res.updatedAt + ' — ' + res.rainingCount + '/' + res.totalPoints + ' điểm đang mưa. Tự làm mới mỗi 10 phút, hoặc bấm vào bản đồ để xem khu vực khác.';
+      updatedEl.textContent = 'Cập nhật lúc ' + res.updatedAt + ' — ' + res.rainingCount + '/' + res.totalPoints + ' điểm đang mưa.';
     }
 
     function refreshRegionalWeatherMap() {
@@ -4664,6 +5217,10 @@
       document.getElementById('adminNavBtnRainSurcharge').classList.toggle('active', tabId === 'adminTabRainSurcharge');
       document.getElementById('adminNavBtnRounding').classList.toggle('active', tabId === 'adminTabRounding');
       document.getElementById('adminNavBtnHistory').classList.toggle('active', tabId === 'adminTabHistory');
+      // Sidebar trên laptop dùng nút riêng -> đồng bộ trạng thái active
+      document.querySelectorAll('.admin-nav-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+      });
 
       // Bản đồ thời tiết khu vực nằm trong tab "Phụ thu mưa": Leaflet vẽ sai kích thước nếu
       // container đang ẩn (display:none), nên phải vẽ lại đúng kích thước mỗi khi mở tab này ra.

@@ -5,7 +5,7 @@
  * - Ô bản đồ (tile.openstreetmap.org): lưu lại, vùng đã xem lần sau hiện ngay, không cần tải lại.
  * - Lệnh gọi API Apps Script (POST), tìm địa chỉ, đường đi, thời tiết, QR: KHÔNG can thiệp, luôn đi thẳng ra mạng.
  */
-const VERSION = 'v10';
+const VERSION = 'v11';
 const SHELL_CACHE = 'hd-shell-' + VERSION;
 const CDN_CACHE = 'hd-cdn-' + VERSION;
 const TILE_CACHE = 'hd-tiles-v1'; // không gắn VERSION: ô bản đồ ít đổi, không cần xoá mỗi lần cập nhật app
