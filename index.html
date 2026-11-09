@@ -3239,6 +3239,7 @@
     }
 
     function enterApp(username, fullName, token) {
+      moneyResetState_();
       currentUser = { username: username, fullName: fullName, token: token };
       localStorage.setItem(TOKEN_KEY, token);
       hideAuthCards();
@@ -4372,6 +4373,72 @@
     let moneyCurrentStatus = 'draft';
     let moneyAutosaveTimer = null;
     let moneySuppressAutosave = false;
+    // --- Cache cho tab Sổ tiền (giảm số lần gọi Apps Script) ---
+    let moneyHistoryItems = null;      // getAllEntries đã tải (null = chưa tải)
+    let moneyHistoryLoading = null;    // Promise đang tải, chống gọi trùng
+    let moneyHistorySeq = 0;           // chống kết quả cũ ghi đè kết quả mới
+    let moneyGoalCache = null;         // getRevenueGoal đã tải
+    let moneyAutosaveInFlight = null;  // Promise lần lưu đang chạy (xếp hàng autosave)
+    let moneyAutosavePending = false;  // có thay đổi mới chờ lưu tiếp
+
+    // Xoá toàn bộ cache/trạng thái Sổ tiền (dùng khi đăng nhập/đăng xuất để
+    // không hiển thị nhầm dữ liệu của tài khoản trước).
+    function moneyResetState_() {
+      clearTimeout(moneyAutosaveTimer);
+      moneyAutosaveTimer = null;
+      moneyAutosaveInFlight = null;
+      moneyAutosavePending = false;
+      moneySuppressAutosave = false;
+      moneyLoaded = false;
+      moneyCurrentStatus = 'draft';
+      moneyHistoryItems = null;
+      moneyHistoryLoading = null;
+      moneyHistorySeq = 0;
+      moneyGoalCache = null;
+      if (moneyChartInstance) {
+        try { moneyChartInstance.destroy(); } catch (e) {}
+        moneyChartInstance = null;
+      }
+    }
+
+    // Tải lịch sử Sổ tiền tối đa 1 lần rồi dùng lại cho lịch sử, mục tiêu và biểu đồ.
+    // force = true để buộc tải mới (sau khi xoá/chốt sổ/cộng phí ship).
+    function moneyFetchHistory_(force) {
+      if (!currentUser) return Promise.resolve([]);
+      if (!force) {
+        if (moneyHistoryItems) return Promise.resolve(moneyHistoryItems);
+        if (moneyHistoryLoading) return moneyHistoryLoading;
+      }
+      const seq = ++moneyHistorySeq;
+      moneyHistoryLoading = moneyGsRun('getAllEntries', currentUser.username).then(function(items) {
+        if (seq === moneyHistorySeq) {
+          moneyHistoryItems = items || [];
+          moneyHistoryLoading = null;
+        }
+        return items || [];
+      }, function(err) {
+        if (seq === moneyHistorySeq) moneyHistoryLoading = null;
+        throw err;
+      });
+      return moneyHistoryLoading;
+    }
+
+    // Cập nhật 1 ngày trong cache lịch sử (sau khi autosave) để không phải gọi lại
+    // getAllEntries. Giữ thứ tự mới nhất trước như backend trả về.
+    function moneyUpsertHistoryItem_(dateStr, loi, status) {
+      if (!moneyHistoryItems) return;
+      let found = false;
+      for (let i = 0; i < moneyHistoryItems.length; i++) {
+        if (moneyHistoryItems[i].date === dateStr) {
+          moneyHistoryItems[i].loi = loi;
+          moneyHistoryItems[i].status = status;
+          found = true;
+          break;
+        }
+      }
+      if (!found) moneyHistoryItems.push({ date: dateStr, loi: loi, status: status });
+      moneyHistoryItems.sort(function(a, b) { return a.date < b.date ? 1 : -1; });
+    }
 
     function moneyGsRun(fnName) {
       const args = Array.prototype.slice.call(arguments, 1);
@@ -4422,6 +4489,8 @@
     });
 
     async function moneyLoadEntry(dateStr) {
+      clearTimeout(moneyAutosaveTimer);
+      moneyAutosaveTimer = null;
       moneySuppressAutosave = true;
       if (!currentUser) { moneySuppressAutosave = false; return; }
       try {
@@ -4460,19 +4529,36 @@
 
     async function moneyAutosaveDraft() {
       if (moneySuppressAutosave || !currentUser) return;
+      // Đang có 1 lần lưu chạy: ghi nhận để lưu tiếp ngay khi xong (không bắn
+      // nhiều request song song làm chậm/nhầm dữ liệu trên Sheet).
+      if (moneyAutosaveInFlight) {
+        moneyAutosavePending = true;
+        return;
+      }
       const dateStr = document.getElementById('moneyDateInput').value || moneyTodayStr();
       const v = moneyGetVals();
       const r = moneyCompute(v);
       const data = Object.assign({}, v, { loi: r.loi, thucNhanApp: r.thucNhanApp, date: dateStr, status: moneyCurrentStatus });
+      moneyAutosaveInFlight = moneyGsRun('saveEntry', currentUser.username, data);
       try {
-        await moneyGsRun('saveEntry', currentUser.username, data);
+        await moneyAutosaveInFlight;
         const now = new Date();
         const hh = String(now.getHours()).padStart(2, '0');
         const mm = String(now.getMinutes()).padStart(2, '0');
         moneyUpdateAutosaveNote(hh + ':' + mm);
-        moneyRenderHistory();
+        // Cập nhật lịch sử + thanh mục tiêu bằng cache, KHÔNG gọi lại getAllEntries.
+        if (moneyHistoryItems) {
+          moneyUpsertHistoryItem_(dateStr, r.loi, moneyCurrentStatus);
+          moneyUpdateHistoryRow_(dateStr, r.loi, moneyCurrentStatus);
+          moneyLoadGoalProgress(moneyHistoryItems);
+        }
       } catch (e) {
         document.getElementById('moneyAutosaveNote').textContent = 'Không lưu nháp được, kiểm tra kết nối mạng';
+      }
+      moneyAutosaveInFlight = null;
+      if (moneyAutosavePending) {
+        moneyAutosavePending = false;
+        moneyAutosaveDraft();
       }
     }
 
@@ -4492,6 +4578,13 @@
 
     async function moneyToggleFinalize() {
       if (!currentUser) return;
+      // Chờ lần autosave đang chạy xong để trạng thái "chốt" luôn là bản ghi sau cùng.
+      clearTimeout(moneyAutosaveTimer);
+      moneyAutosaveTimer = null;
+      if (moneyAutosaveInFlight) {
+        try { await moneyAutosaveInFlight; } catch (e) {}
+      }
+      moneyAutosavePending = false;
       const dateStr = document.getElementById('moneyDateInput').value || moneyTodayStr();
       moneyCurrentStatus = (moneyCurrentStatus === 'final') ? 'draft' : 'final';
       moneyUpdateToggleUI();
@@ -4511,47 +4604,74 @@
         moneyUpdateToggleUI();
       }
       sw.disabled = false;
-      await moneyRenderHistory();
+      await moneyRenderHistory(true);
+      if (moneyAutosavePending) {
+        moneyAutosavePending = false;
+        moneyAutosaveDraft();
+      }
       setTimeout(function() { statusMsg.textContent = ''; }, 2500);
     }
 
-    async function moneyRenderHistory() {
+    async function moneyRenderHistory(force) {
       const histList = document.getElementById('moneyHistList');
       if (!currentUser) { histList.innerHTML = '<div class="mb-hist-empty">Chưa đăng nhập</div>'; return; }
-      moneyLoadGoalProgress();
       try {
-        const items = await moneyGsRun('getAllEntries', currentUser.username);
-        if (!items || items.length === 0) {
-          histList.innerHTML = '<div class="mb-hist-empty">Chưa có ngày nào được lưu</div>';
-          return;
-        }
-        histList.innerHTML = '';
-        items.forEach(function(item) {
-          const row = document.createElement('div');
-          row.className = 'mb-hist-item';
-          const cls = item.loi > 0 ? 'pos' : item.loi < 0 ? 'neg' : '';
-          const tagCls = item.status === 'final' ? 'final' : 'draft';
-          const tagLabel = item.status === 'final' ? 'Đã chốt' : 'Nháp';
-          row.innerHTML =
-            '<div class="mb-hist-row"><div class="mb-d">' + item.date + '</div>' +
-            '<span class="mb-tag ' + tagCls + '">' + tagLabel + '</span></div>' +
-            '<div style="display:flex;align-items:center;justify-content:flex-end;">' +
-            '<div class="mb-v ' + cls + '">' + (item.loi > 0 ? '+' : '') + moneyFmt(item.loi) + '</div>' +
-            '<button class="mb-del" title="Xóa">✕</button></div>';
-          row.querySelector('.mb-hist-row').addEventListener('click', function() {
-            document.getElementById('moneyDateInput').value = item.date;
-            moneyLoadEntry(item.date);
-          });
-          row.querySelector('.mb-del').addEventListener('click', async function(ev) {
-            ev.stopPropagation();
-            try { await moneyGsRun('deleteEntry', currentUser.username, item.date); } catch (e) {}
-            await moneyRenderHistory();
-          });
-          histList.appendChild(row);
-        });
+        // Chỉ 1 request getAllEntries, dùng chung cho cả danh sách lẫn thanh mục tiêu.
+        const items = await moneyFetchHistory_(force);
+        moneyRenderHistoryList_(items);
+        moneyLoadGoalProgress(items);
       } catch (e) {
         histList.innerHTML = '<div class="mb-hist-empty">Không tải được lịch sử từ sheet</div>';
       }
+    }
+
+    function moneyRenderHistoryList_(items) {
+      const histList = document.getElementById('moneyHistList');
+      if (!items || items.length === 0) {
+        histList.innerHTML = '<div class="mb-hist-empty">Chưa có ngày nào được lưu</div>';
+        return;
+      }
+      histList.innerHTML = '';
+      items.forEach(function(item) {
+        const row = document.createElement('div');
+        row.className = 'mb-hist-item';
+        row.dataset.date = item.date;
+        const cls = item.loi > 0 ? 'pos' : item.loi < 0 ? 'neg' : '';
+        const tagCls = item.status === 'final' ? 'final' : 'draft';
+        const tagLabel = item.status === 'final' ? 'Đã chốt' : 'Nháp';
+        row.innerHTML =
+          '<div class="mb-hist-row"><div class="mb-d">' + item.date + '</div>' +
+          '<span class="mb-tag ' + tagCls + '">' + tagLabel + '</span></div>' +
+          '<div style="display:flex;align-items:center;justify-content:flex-end;">' +
+          '<div class="mb-v ' + cls + '">' + (item.loi > 0 ? '+' : '') + moneyFmt(item.loi) + '</div>' +
+          '<button class="mb-del" title="Xóa">✕</button></div>';
+        row.querySelector('.mb-hist-row').addEventListener('click', function() {
+          document.getElementById('moneyDateInput').value = item.date;
+          moneyLoadEntry(item.date);
+        });
+        row.querySelector('.mb-del').addEventListener('click', async function(ev) {
+          ev.stopPropagation();
+          try { await moneyGsRun('deleteEntry', currentUser.username, item.date); } catch (e) {}
+          await moneyRenderHistory(true);
+        });
+        histList.appendChild(row);
+      });
+    }
+
+    // Cập nhật nhanh đúng 1 dòng lịch sử (sau autosave), không dựng lại cả danh sách.
+    function moneyUpdateHistoryRow_(dateStr, loi, status) {
+      const histList = document.getElementById('moneyHistList');
+      const row = histList.querySelector('.mb-hist-item[data-date="' + dateStr + '"]');
+      if (!row) {
+        moneyRenderHistoryList_(moneyHistoryItems || []);
+        return;
+      }
+      const valueEl = row.querySelector('.mb-v');
+      valueEl.textContent = (loi > 0 ? '+' : '') + moneyFmt(loi);
+      valueEl.className = 'mb-v ' + (loi > 0 ? 'pos' : loi < 0 ? 'neg' : '');
+      const tagEl = row.querySelector('.mb-tag');
+      tagEl.className = 'mb-tag ' + (status === 'final' ? 'final' : 'draft');
+      tagEl.textContent = status === 'final' ? 'Đã chốt' : 'Nháp';
     }
 
     // ================= BIỂU ĐỒ DOANH THU (lấy dữ liệu từ Sổ Chạy Xe) =================
@@ -4571,7 +4691,7 @@
       summaryEl.textContent = 'Đang tải...';
       try {
         const period = document.getElementById('moneyChartPeriod').value;
-        const items = await moneyGsRun('getAllEntries', currentUser.username);
+        const items = await moneyFetchHistory_();
         let filtered = (items || []).slice().sort(function(a, b) { return a.date < b.date ? -1 : 1; });
         if (period !== 'all') {
           filtered = filtered.slice(-Number(period));
@@ -4623,18 +4743,26 @@
     }
 
     // ================= MỤC TIÊU DOANH THU (lấy dữ liệu từ Sổ Chạy Xe) =================
-    async function moneyLoadGoalProgress() {
+    // items: danh sách lịch sử đã có sẵn (tránh gọi getAllEntries lần nữa).
+    // forceGoal: true để buộc tải lại mục tiêu từ Sheet (sau khi người dùng lưu mục tiêu mới).
+    async function moneyLoadGoalProgress(items, forceGoal) {
       if (!currentUser) return;
       try {
-        const goal = await moneyGsRun('getRevenueGoal', currentUser.username);
-        document.getElementById('moneyGoalDayInput').value = goal.dailyGoal || '';
-        document.getElementById('moneyGoalMonthInput').value = goal.monthlyGoal || '';
+        if (forceGoal || !moneyGoalCache) {
+          const fetched = await moneyGsRun('getRevenueGoal', currentUser.username);
+          moneyGoalCache = fetched || { dailyGoal: 0, monthlyGoal: 0 };
+          // Chỉ đổ lại vào ô nhập khi thực sự vừa tải từ Sheet, tránh xoá
+          // nội dung người dùng đang gõ dở mỗi khi autosave cập nhật thanh mục tiêu.
+          document.getElementById('moneyGoalDayInput').value = moneyGoalCache.dailyGoal || '';
+          document.getElementById('moneyGoalMonthInput').value = moneyGoalCache.monthlyGoal || '';
+        }
+        const goal = moneyGoalCache;
 
-        const items = await moneyGsRun('getAllEntries', currentUser.username);
+        const list = items || moneyHistoryItems || await moneyFetchHistory_();
         const todayStr = moneyTodayStr();
         const monthPrefix = todayStr.slice(0, 7);
         let todayLoi = 0, monthLoi = 0;
-        (items || []).forEach(function(it) {
+        (list || []).forEach(function(it) {
           const v = Number(it.loi) || 0;
           if (it.date === todayStr) todayLoi = v;
           if (it.date.slice(0, 7) === monthPrefix) monthLoi += v;
@@ -4689,7 +4817,7 @@
         if (res.success) {
           errorBox.style.color = '#1b7a1b';
           errorBox.textContent = 'Đã lưu mục tiêu.';
-          await moneyLoadGoalProgress();
+          await moneyLoadGoalProgress(moneyHistoryItems, true);
         } else {
           errorBox.style.color = '#d32f2f';
           errorBox.textContent = res.message;
@@ -4707,6 +4835,8 @@
       btn.classList.add('spin');
       btn.textContent = '⟳ Đang tải...';
       await moneyLoadEntry(document.getElementById('moneyDateInput').value);
+      // Người dùng chủ động bấm tải lại: làm mới cả lịch sử/mục tiêu từ Sheet.
+      moneyRenderHistory(true);
       btn.classList.remove('spin');
       btn.textContent = '⟳ Tải nháp';
       const statusMsg = document.getElementById('moneyStatusMsg');
@@ -4769,7 +4899,7 @@
           if (moneyLoaded && document.getElementById('moneyDateInput').value === dateStr) {
             moneyLoadEntry(dateStr);
           }
-          moneyLoaded && moneyRenderHistory();
+          if (moneyLoaded) moneyRenderHistory(true);
         })
         .withFailureHandler(function(err) {
           console.error('Không cộng được phí ship vào Sổ Chạy Xe:', err);
@@ -4857,6 +4987,7 @@
       if (token) google.script.run.logoutSession(token);
       localStorage.removeItem(TOKEN_KEY);
       currentUser = null;
+      moneyResetState_();
       lastTrip = null;
       drafts = [];
       document.getElementById('loginUsername').value = '';
