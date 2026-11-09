@@ -2633,6 +2633,17 @@
         </div>
       </div>
 
+      <div class="settings-group">
+        <div class="settings-group-title">Ứng dụng</div>
+        <div class="settings-list">
+          <div class="settings-item" onclick="checkAppVersion()">
+            <span class="settings-item-main"><span class="settings-item-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-3px"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16.5"/><line x1="12" y1="7.5" x2="12" y2="7.51"/></svg></span><span class="settings-item-text">Phiên bản</span></span>
+            <span class="settings-value" id="appVersionValue">...</span>
+          </div>
+        </div>
+        <div class="hint" id="appVersionHint">Bấm vào để kiểm tra bản cập nhật mới.</div>
+      </div>
+
       <!-- Panel: Lịch sử -->
       <div class="settings-panel hidden" id="historyPanel">
         <h3>Lịch sử đơn hàng (chỉ lưu 7 ngày gần nhất)</h3>
@@ -3062,6 +3073,9 @@
     const TOKEN_KEY = 'taxiapp_session_token';
     const DARK_KEY = 'taxiapp_dark_mode';
     const ONBOARD_KEY = 'taxiapp_onboarded';
+    // Phiên bản app hiển thị ở tab Cài đặt. Mỗi lần phát hành bản mới, tăng số này
+    // ĐỒNG THỜI với VERSION trong sw.js để người dùng nhận được bản cập nhật.
+    const APP_VERSION = 'v4';
     const fieldCoords = { origin: null, destination: null };
     let mapPicker = null;          // instance bản đồ Leaflet dùng riêng cho modal chọn vị trí
     let mapPickerWhich = null;     // 'origin' hoặc 'destination' đang được chọn
@@ -4335,6 +4349,9 @@
       }
       if (tabId === 'moneyTab') {
         moneyInitIfNeeded();
+      }
+      if (tabId === 'settingsTab') {
+        renderAppVersion_();
       }
     }
 
@@ -6412,6 +6429,35 @@
       document.getElementById('darkModeStatus').textContent = isDark ? 'Tối' : 'Sáng';
       const chartPanel = document.getElementById('moneyChartPanel');
       if (chartPanel && !chartPanel.classList.contains('hidden')) moneyRenderChart();
+    }
+
+    // ================= CÀI ĐẶT: PHIÊN BẢN ỨNG DỤNG =================
+    function renderAppVersion_() {
+      const el = document.getElementById('appVersionValue');
+      if (el) el.textContent = APP_VERSION;
+    }
+
+    // Bấm vào dòng "Phiên bản": kiểm tra xem trên máy chủ đã có bản mới hơn chưa.
+    function checkAppVersion() {
+      const valueEl = document.getElementById('appVersionValue');
+      const hintEl = document.getElementById('appVersionHint');
+      if (!valueEl || !hintEl) return;
+      valueEl.textContent = APP_VERSION;
+      hintEl.textContent = 'Đang kiểm tra bản mới...';
+      fetch('./sw.js', { cache: 'no-store' })
+        .then(function(res) { return res.ok ? res.text() : ''; })
+        .then(function(txt) {
+          const m = txt && txt.match(/VERSION\s*=\s*['"]([^'"]+)['"]/);
+          const latest = m ? m[1] : '';
+          if (!latest || latest === APP_VERSION) {
+            hintEl.textContent = 'Bạn đang dùng bản mới nhất.';
+          } else {
+            hintEl.textContent = 'Đã có bản ' + latest + ' — hãy đóng hẳn app rồi mở lại 2 lần để cập nhật.';
+          }
+        })
+        .catch(function() {
+          hintEl.textContent = 'Không kiểm tra được (có thể do mất mạng).';
+        });
     }
 
     // ================= CÀI ĐẶT: LỊCH SỬ ĐƠN HÀNG =================
