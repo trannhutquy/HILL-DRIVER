@@ -5,7 +5,7 @@
  * - Ô bản đồ (tile.openstreetmap.org): lưu lại, vùng đã xem lần sau hiện ngay, không cần tải lại.
  * - Lệnh gọi API Apps Script (POST), tìm địa chỉ, đường đi, thời tiết, QR: KHÔNG can thiệp, luôn đi thẳng ra mạng.
  */
-const VERSION = 'v4';
+const VERSION = 'v5';
 const SHELL_CACHE = 'hd-shell-' + VERSION;
 const CDN_CACHE = 'hd-cdn-' + VERSION;
 const TILE_CACHE = 'hd-tiles-v1'; // không gắn VERSION: ô bản đồ ít đổi, không cần xoá mỗi lần cập nhật app
@@ -13,6 +13,9 @@ const TILE_MAX = 500;
 const SHELL_FILES = [
   './', './index.html', './config.js', './gas-shim.js', './pwa.js',
   './manifest.webmanifest',
+  './assets/favicon.png',
+  './assets/logo-light.png', './assets/logo-dark.png',
+  './assets/logo-icon-light.png', './assets/logo-icon-dark.png',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'
 ];
 const CDN_HOSTS = ['unpkg.com', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
