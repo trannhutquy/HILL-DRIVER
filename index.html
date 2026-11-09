@@ -16,47 +16,120 @@
     // ===== TẢI THƯ VIỆN KHI CẦN (lazy-load) =====
     // Leaflet / Chart.js / jsPDF / html2canvas chỉ được tải khi thật sự dùng tới,
     // giúp app mở nhanh hơn nhiều trên mạng yếu. Mỗi thư viện chỉ tải 1 lần.
+    // Có nhiều máy chủ dự phòng + giới hạn thời gian chờ: mạng 4G chặn 1 CDN
+    // (hay gặp với unpkg) thì tự chuyển sang CDN khác thay vì treo mãi.
     window.HDLib = (function () {
       var cache = {};
-      function loadScript(src) {
-        if (!cache[src]) {
-          cache[src] = new Promise(function (resolve, reject) {
-            var s = document.createElement('script');
-            s.src = src;
-            s.async = true;
-            s.onload = function () { resolve(); };
-            s.onerror = function () { delete cache[src]; reject(new Error('Không tải được: ' + src)); };
-            document.head.appendChild(s);
+      var LOAD_TIMEOUT_MS = 8000; // mỗi máy chủ chờ tối đa 8 giây rồi thử máy chủ kế tiếp
+
+      function loadOneScript(src) {
+        return new Promise(function (resolve, reject) {
+          var s = document.createElement('script');
+          var done = false;
+          var timer = setTimeout(function () {
+            if (done) return;
+            done = true;
+            s.onload = s.onerror = null;
+            if (s.parentNode) s.parentNode.removeChild(s);
+            reject(new Error('Quá thời gian tải: ' + src));
+          }, LOAD_TIMEOUT_MS);
+          s.src = src;
+          s.async = true;
+          s.onload = function () {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            resolve();
+          };
+          s.onerror = function () {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            if (s.parentNode) s.parentNode.removeChild(s);
+            reject(new Error('Không tải được: ' + src));
+          };
+          document.head.appendChild(s);
+        });
+      }
+
+      function loadOneStyle(href) {
+        return new Promise(function (resolve, reject) {
+          var l = document.createElement('link');
+          var done = false;
+          var timer = setTimeout(function () {
+            if (done) return;
+            done = true;
+            reject(new Error('Quá thời gian tải CSS: ' + href));
+          }, LOAD_TIMEOUT_MS);
+          l.rel = 'stylesheet';
+          l.href = href;
+          l.onload = function () { if (done) return; done = true; clearTimeout(timer); resolve(); };
+          l.onerror = function () { if (done) return; done = true; clearTimeout(timer); reject(new Error('Không tải được CSS: ' + href)); };
+          document.head.appendChild(l);
+        });
+      }
+
+      // Thử lần lượt từng máy chủ trong danh sách, cái đầu tiên tải được sẽ dùng.
+      function loadFirstAvailable(urls, loader) {
+        var key = urls.join('|');
+        if (!cache[key]) {
+          cache[key] = new Promise(function (resolve, reject) {
+            var i = 0;
+            function next() {
+              if (i >= urls.length) { reject(new Error('Không tải được thư viện')); return; }
+              loader(urls[i++]).then(resolve, next);
+            }
+            next();
+          }).catch(function (err) {
+            delete cache[key]; // cho phép thử lại ở lần sau
+            throw err;
           });
         }
-        return cache[src];
+        return cache[key];
       }
-      function loadStyle(href) {
-        if (!cache[href]) {
-          cache[href] = new Promise(function (resolve) {
-            var l = document.createElement('link');
-            l.rel = 'stylesheet';
-            l.href = href;
-            l.onload = function () { resolve(); };
-            l.onerror = function () { resolve(); }; // CSS lỗi không chặn app
-            document.head.appendChild(l);
-          });
-        }
-        return cache[href];
-      }
-      var LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      var LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      var CHART_JS = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js';
-      var JSPDF_JS = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      var H2C_JS = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+
+      function asList(x) { return Array.isArray(x) ? x : [x]; }
+
+      var LEAFLET_JS = [
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js',
+        'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
+        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+      ];
+      var LEAFLET_CSS = [
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',
+        'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css',
+        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      ];
+      var CHART_JS = [
+        'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js',
+        'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js'
+      ];
+      var JSPDF_JS = [
+        'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+        'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'
+      ];
+      var H2C_JS = [
+        'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'
+      ];
+
       return {
-        script: loadScript,
-        style: loadStyle,
+        script: function (src) { return loadFirstAvailable(asList(src), loadOneScript); },
+        style: function (href) { return loadFirstAvailable(asList(href), loadOneStyle); },
         leaflet: function () {
-          return Promise.all([loadStyle(LEAFLET_CSS), loadScript(LEAFLET_JS)]);
+          return Promise.all([
+            // CSS lỗi/không tải được cũng không chặn bản đồ mở (chỉ xấu hơn một chút)
+            loadFirstAvailable(LEAFLET_CSS, loadOneStyle).catch(function () {}),
+            loadFirstAvailable(LEAFLET_JS, loadOneScript)
+          ]);
         },
-        chart: function () { return loadScript(CHART_JS); },
-        pdf: function () { return Promise.all([loadScript(JSPDF_JS), loadScript(H2C_JS)]); }
+        chart: function () { return loadFirstAvailable(CHART_JS, loadOneScript); },
+        pdf: function () {
+          return Promise.all([
+            loadFirstAvailable(JSPDF_JS, loadOneScript),
+            loadFirstAvailable(H2C_JS, loadOneScript)
+          ]);
+        }
       };
     })();
   </script>
@@ -66,7 +139,10 @@
   <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://router.project-osrm.org" crossorigin>
   <link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
-  <link rel="preconnect" href="https://a.tile.openstreetmap.org">
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="preconnect" href="https://tile.openstreetmap.de">
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -3101,6 +3177,8 @@
     let routeLine = null;
     let originMarker = null;
     let destMarker = null;
+    let lastMapRes = null; // lưu kết quả chuyến đi để bấm "Thử lại" khi tải bản đồ lỗi
+    const MAP_PLACEHOLDER_DEFAULT = 'Chưa có dữ liệu chuyến đi.<br>Vào "Trang chính" nhập điểm đi/điểm đến và bấm "Tính tiền" trước nhé.';
     let lastTrip = null; // dữ liệu chuyến đi vừa tính, chờ "Chốt đơn"
     let drafts = [];     // danh sách chuyến đã lưu nháp (có điểm đi, chưa có điểm đến)
     let addressSearchTimers = { origin: null, destination: null };
@@ -3118,7 +3196,7 @@
     const ONBOARD_KEY = 'taxiapp_onboarded';
     // Phiên bản app hiển thị ở tab Cài đặt. Mỗi lần phát hành bản mới, tăng số này
     // ĐỒNG THỜI với VERSION trong sw.js để người dùng nhận được bản cập nhật.
-    const APP_VERSION = 'v5';
+    const APP_VERSION = 'v6';
     const fieldCoords = { origin: null, destination: null };
     let mapPicker = null;          // instance bản đồ Leaflet dùng riêng cho modal chọn vị trí
     let mapPickerWhich = null;     // 'origin' hoặc 'destination' đang được chọn
@@ -3300,6 +3378,16 @@
       currentUser = { username: username, fullName: fullName, token: token };
       localStorage.setItem(TOKEN_KEY, token);
       hideAuthCards();
+
+      // Tải sẵn thư viện bản đồ trong lúc rảnh (sau 2 giây) để lúc mở bản đồ
+      // không phải chờ — nhất là trên 4G yếu. Không chặn giao diện; lỗi thì bỏ qua,
+      // khi mở bản đồ sẽ tự thử lại qua máy chủ dự phòng.
+      setTimeout(function() {
+        try {
+          if (navigator.connection && navigator.connection.saveData) return; // tôn trọng chế độ tiết kiệm dữ liệu
+          HDLib.leaflet().catch(function() {});
+        } catch (e) {}
+      }, 2000);
 
       if (isAdminUser()) {
         document.getElementById('appShell').classList.add('hidden');
@@ -3714,15 +3802,49 @@
     let regionalWeatherCenterMarker = null;
     let regionalWeatherCenter = { lat: 10.4938, lng: 105.7628 }; // trung tâm mặc định khi chưa xác định vị trí
 
+    // Lớp nền bản đồ dùng chung: ưu tiên OpenStreetMap; nếu mạng (nhất là 4G)
+    // không tải được ô bản đồ từ OSM (DNS nhà mạng đôi khi không phân giải được
+    // tile.openstreetmap.org) thì tự chuyển sang máy chủ dự phòng khác tên miền.
+    function addBaseTiles_(targetMap, maxZoom) {
+      const zoom = maxZoom || 19;
+      const primary = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: zoom,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(targetMap);
+
+      let errors = 0, loaded = 0, switched = false, watchdog = null;
+      function useFallback() {
+        if (switched) return;
+        switched = true;
+        if (watchdog) clearTimeout(watchdog);
+        targetMap.removeLayer(primary);
+        L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+          maxZoom: zoom,
+          attribution: '&copy; OpenStreetMap (FOSSGIS)'
+        }).addTo(targetMap);
+      }
+      primary.on('tileload', function() {
+        loaded++;
+        if (loaded === 1 && watchdog) { clearTimeout(watchdog); watchdog = null; }
+      });
+      primary.on('tileerror', function() {
+        errors++;
+        // Nhiều ô lỗi liên tiếp mà chưa ô nào tải được -> OSM không dùng được
+        if (errors >= 4 && loaded === 0) useFallback();
+      });
+      // Chậm quá 10 giây vẫn chưa có ô nào -> đổi máy chủ cho chắc
+      watchdog = setTimeout(function() {
+        if (loaded === 0) useFallback();
+      }, 10000);
+      return primary;
+    }
+
     function initRegionalWeatherMap_() {
       if (regionalWeatherMap) return Promise.resolve();
       return HDLib.leaflet().then(function() {
         if (regionalWeatherMap) return; // có thể vừa được tạo xong trong lúc chờ tải thư viện
         regionalWeatherMap = L.map('regionalWeatherMap').setView([regionalWeatherCenter.lat, regionalWeatherCenter.lng], 10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 18,
-          attribution: '&copy; OpenStreetMap'
-        }).addTo(regionalWeatherMap);
+        addBaseTiles_(regionalWeatherMap, 18);
         regionalWeatherMap.on('click', function(e) {
           regionalWeatherCenter = { lat: e.latlng.lat, lng: e.latlng.lng };
           fetchRegionalWeather();
@@ -5232,10 +5354,7 @@
           HDLib.leaflet().then(function() {
             if (!mapPicker) {
               mapPicker = L.map('mapPickerMap');
-              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors',
-                maxZoom: 19
-              }).addTo(mapPicker);
+              addBaseTiles_(mapPicker, 19);
               mapPicker.on('moveend', onMapPickerMoved);
             } else {
               // Đã có bản đồ từ lần mở trước -> ép tính lại kích thước ngay,
@@ -6402,16 +6521,14 @@
 
     // ---------- VẼ BẢN ĐỒ + ĐƯỜNG ĐI MÀU VÀNG ----------
     function drawMap(res) {
+      lastMapRes = res;
       document.getElementById('mapPlaceholder').classList.add('hidden');
       document.getElementById('map').classList.remove('hidden');
 
       return HDLib.leaflet().then(function() {
         if (!map) {
           map = L.map('map');
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors',
-            maxZoom: 19
-          }).addTo(map);
+          addBaseTiles_(map, 19);
         }
 
         if (routeLine) { map.removeLayer(routeLine); }
@@ -6422,15 +6539,30 @@
         originMarker = L.marker(res.originCoord).addTo(map).bindPopup('Điểm đi: ' + res.originAddress);
         destMarker = L.marker(res.destCoord).addTo(map).bindPopup('Điểm đến: ' + res.destAddress);
 
+        // Vẽ xong thì trả placeholder về câu mặc định cho lần sau
+        const ph = document.getElementById('mapPlaceholder');
+        if (ph) ph.innerHTML = MAP_PLACEHOLDER_DEFAULT;
+
         setTimeout(function() {
           map.invalidateSize();
           map.fitBounds(routeLine.getBounds(), { padding: [24, 24] });
         }, 150);
       }).catch(function(err) {
         console.warn('Không tải được thư viện bản đồ:', err);
-        document.getElementById('mapPlaceholder').classList.remove('hidden');
+        const ph = document.getElementById('mapPlaceholder');
+        if (ph) {
+          ph.innerHTML = 'Không tải được bản đồ.<br>Kiểm tra dữ liệu di động/WiFi rồi bấm thử lại.' +
+            '<br><button type="button" onclick="retryDrawMap()" style="margin-top:12px;padding:9px 20px;border:none;border-radius:10px;background:#4F46E5;color:#fff;font-weight:600;font-size:14px;">Thử lại</button>';
+          ph.classList.remove('hidden');
+        }
         document.getElementById('map').classList.add('hidden');
       });
+    }
+
+    // Bấm "Thử lại" trên khung bản đồ khi lần trước tải thư viện thất bại
+    function retryDrawMap() {
+      if (!lastMapRes) return;
+      drawMap(lastMapRes);
     }
 
     // ================= CÀI ĐẶT: HỒ SƠ / AVATAR =================

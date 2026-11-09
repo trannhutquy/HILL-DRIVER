@@ -5,7 +5,7 @@
  * - Ô bản đồ (tile.openstreetmap.org): lưu lại, vùng đã xem lần sau hiện ngay, không cần tải lại.
  * - Lệnh gọi API Apps Script (POST), tìm địa chỉ, đường đi, thời tiết, QR: KHÔNG can thiệp, luôn đi thẳng ra mạng.
  */
-const VERSION = 'v5';
+const VERSION = 'v6';
 const SHELL_CACHE = 'hd-shell-' + VERSION;
 const CDN_CACHE = 'hd-cdn-' + VERSION;
 const TILE_CACHE = 'hd-tiles-v1'; // không gắn VERSION: ô bản đồ ít đổi, không cần xoá mỗi lần cập nhật app
@@ -18,7 +18,7 @@ const SHELL_FILES = [
   './assets/logo-icon-light.png', './assets/logo-icon-dark.png',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'
 ];
-const CDN_HOSTS = ['unpkg.com', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
+const CDN_HOSTS = ['unpkg.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', function (event) {
   event.waitUntil(
@@ -101,7 +101,7 @@ self.addEventListener('fetch', function (event) {
     }
     return;
   }
-  if (/(^|\.)tile\.openstreetmap\.org$/.test(url.hostname)) {
+  if (/(^|\.)(tile\.openstreetmap\.org|tile\.openstreetmap\.de|tile\.openstreetmap\.fr)$/.test(url.hostname)) {
     event.respondWith(tileFirst(event));
     return;
   }
