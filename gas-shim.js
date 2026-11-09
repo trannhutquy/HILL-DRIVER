@@ -20,7 +20,11 @@
   var NOMINATIM = 'https://nominatim.openstreetmap.org';
   var OSRM = 'https://router.project-osrm.org';
   var METEO = 'https://api.open-meteo.com/v1/forecast';
+  // Bán kính ưu tiên (không phải giới hạn cứng): địa chỉ quanh vị trí hiện tại
+  // được xếp hạng trước, nhưng điểm đến ở xa vẫn tìm thấy (trước đây dùng
+  // bounded=1 nên địa chỉ ngoài 20km biến mất khỏi danh sách gợi ý).
   var SUGGEST_RADIUS_KM = 20;
+  var GEOCODE_BIAS_RADIUS_KM = 50; // ưu tiên nhẹ quanh điểm đi khi tìm toạ độ điểm đến
 
   var lastApiAt = Date.now();
 
@@ -197,11 +201,15 @@
   DIRECT.searchAddressSuggestions = function (query, nearLat, nearLng) {
     query = String(query || '').trim();
     if (!query || query.length < 3) return Promise.resolve({ success: true, items: [] });
-    var url = NOMINATIM + '/search?format=json&addressdetails=0&limit=5&countrycodes=vn&q=' + encodeURIComponent(query);
+    // accept-language=vi: trả tên đường/phường/tỉnh bằng tiếng Việt (trước đây có
+    // thể trả "Vietnam", tên tiếng Anh hoặc tên phiên âm -> nhìn như sai địa chỉ).
+    var url = NOMINATIM + '/search?format=json&addressdetails=1&accept-language=vi&limit=6&countrycodes=vn&q=' + encodeURIComponent(query);
     var keyRaw = normText(query);
     var lat = Number(nearLat), lng = Number(nearLng);
     if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) > 0.0001 && Math.abs(lng) > 0.0001) {
-      url += '&viewbox=' + viewbox(lat, lng, SUGGEST_RADIUS_KM) + '&bounded=1';
+      // viewbox KHÔNG kèm bounded=1: chỉ ưu tiên khu vực đang đứng, không loại bỏ
+      // địa chỉ ở tỉnh/thành khác (điểm đến xa vẫn gợi ý được).
+      url += '&viewbox=' + viewbox(lat, lng, SUGGEST_RADIUS_KM);
       keyRaw += '|' + lat.toFixed(2) + ',' + lng.toFixed(2);
     }
     var key = 'sg:' + keyRaw;
@@ -216,12 +224,17 @@
   };
 
   // Địa chỉ chữ -> toạ độ
-  DIRECT.geocodeAddress = function (address) {
+  // nearLat/nearLng (không bắt buộc): vị trí để ưu tiên khi tên đường/địa chỉ
+  // trùng ở nhiều tỉnh/thành. Chỉ là ưu tiên nhẹ (không giới hạn cứng).
+  DIRECT.geocodeAddress = function (address, nearLat, nearLng) {
     if (!address) return Promise.resolve({ success: false, message: 'Địa chỉ trống.' });
-    var key = 'geo:' + normText(address);
+    var lat = Number(nearLat), lng = Number(nearLng);
+    var hasNear = !isNaN(lat) && !isNaN(lng) && Math.abs(lat) > 0.0001 && Math.abs(lng) > 0.0001;
+    var key = 'geo:' + normText(address) + (hasNear ? '|' + lat.toFixed(2) + ',' + lng.toFixed(2) : '');
     var hit = cacheGet(key);
     if (hit) return Promise.resolve(hit);
-    var url = NOMINATIM + '/search?format=json&limit=1&countrycodes=vn&q=' + encodeURIComponent(address);
+    var url = NOMINATIM + '/search?format=json&addressdetails=1&accept-language=vi&limit=1&countrycodes=vn&q=' + encodeURIComponent(address);
+    if (hasNear) url += '&viewbox=' + viewbox(lat, lng, GEOCODE_BIAS_RADIUS_KM);
     return fetchJson(url).then(function (json) {
       if (!Array.isArray(json)) throw new Error('bad');
       if (json.length === 0) {
@@ -239,7 +252,9 @@
     var key = 'rev:' + lat.toFixed(4) + ',' + lng.toFixed(4);
     var hit = cacheGet(key);
     if (hit) return Promise.resolve(hit);
-    var url = NOMINATIM + '/reverse?format=json&lat=' + lat + '&lon=' + lng;
+    // accept-language=vi + zoom=18: lấy địa chỉ chi tiết nhất (tới đường/số nhà
+    // nếu OpenStreetMap có dữ liệu) và hiển thị bằng tiếng Việt.
+    var url = NOMINATIM + '/reverse?format=json&addressdetails=1&accept-language=vi&zoom=18&lat=' + lat + '&lon=' + lng;
     return fetchJson(url).then(function (json) {
       if (!json || json.error) throw new Error('bad');
       var res = { success: true, displayName: json.display_name || (lat.toFixed(6) + ', ' + lng.toFixed(6)) };
