@@ -1870,6 +1870,19 @@
     #moneyTab .mb-sub-row{display:flex;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px dashed #e0e6d8;font-family:'JetBrains Mono',monospace,monospace;font-size:13px;}
     #moneyTab .mb-sub-row .mb-lab{color:#8b96a3;font-family:inherit;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;display:block;}
     #moneyTab .mb-sub-row .mb-val{font-weight:600;display:block;}
+    /* Tổng quan nhanh: doanh thu / chi phí / thu từ app */
+    #moneyTab .mb-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;padding-top:12px;border-top:1px dashed #e0e6d8;}
+    #moneyTab .mb-stat{min-width:0;}
+    #moneyTab .mb-stat-lab{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:#8b96a3;margin-bottom:3px;}
+    #moneyTab .mb-stat-val{display:block;font-family:'JetBrains Mono',monospace,monospace;font-size:13px;font-weight:700;color:#333;word-break:break-word;}
+    #moneyTab .mb-stat-val.pos{color:#4c8a1f;}
+    #moneyTab .mb-stat-val.neg{color:#d3453a;}
+    /* Nhập theo cặp (đầu kỳ / cuối kỳ) cho gọn, kèm dòng chênh lệch */
+    #moneyTab .mb-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    #moneyTab .mb-pair .mb-field{margin-bottom:6px;}
+    #moneyTab .mb-delta{font-size:11.5px;font-weight:600;color:#8b96a3;margin:0 0 8px;}
+    #moneyTab .mb-delta.pos{color:#4c8a1f;}
+    #moneyTab .mb-delta.neg{color:#d3453a;}
     #moneyTab .mb-group{background:#fff;border:1px solid #e6e6e6;border-radius:18px;padding:14px 14px 6px;margin-bottom:14px;box-shadow:0 2px 8px rgba(20,40,20,0.03);transition:box-shadow .15s ease;}
     #moneyTab .mb-group:focus-within{box-shadow:0 4px 14px rgba(76,138,31,0.10);border-color:rgba(76,138,31,0.35);}
     #moneyTab .mb-group-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8b96a3;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
@@ -1892,10 +1905,13 @@
     #moneyTab .mb-toggle-switch.on .mb-toggle-knob{background:#4c8a1f;transform:translateX(24px);}
     #moneyTab .mb-status{text-align:center;font-size:12px;color:#8b96a3;margin:-10px 0 16px;min-height:16px;}
     #moneyTab .mb-hist-title{font-size:12px;font-weight:700;text-transform:uppercase;color:#8b96a3;margin:18px 0 8px;}
-    #moneyTab .mb-hist-item{background:#fff;border:1px solid #e6e6e6;border-radius:16px;padding:10px 12px;margin-bottom:8px;box-shadow:0 2px 6px rgba(20,40,20,0.03);transition:box-shadow .15s ease,transform .1s ease;}
+    #moneyTab .mb-hist-item{background:#fff;border:1px solid #e6e6e6;border-radius:16px;padding:10px 12px;margin-bottom:8px;box-shadow:0 2px 6px rgba(20,40,20,0.03);transition:box-shadow .15s ease,transform .1s ease;cursor:pointer;}
     #moneyTab .mb-hist-item:active{transform:scale(.99);}
     #moneyTab .mb-hist-row{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
     #moneyTab .mb-hist-item .mb-d{font-size:13px;font-weight:600;}
+    #moneyTab .mb-hist-sub{font-size:10.5px;color:#8b96a3;margin-top:2px;font-family:'JetBrains Mono',monospace,monospace;}
+    #moneyTab .mb-hist-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:6px;}
+    #moneyTab .mb-v-lab{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8b96a3;margin-right:4px;}
     #moneyTab .mb-hist-item .mb-v{font-family:'JetBrains Mono',monospace,monospace;font-weight:700;font-size:14px;margin-right:8px;}
     #moneyTab .mb-hist-item .mb-v.pos{color:#4c8a1f;}
     #moneyTab .mb-hist-item .mb-v.neg{color:#d3453a;}
@@ -1906,25 +1922,37 @@
     #moneyTab .mb-hist-item .mb-del:active{transform:scale(.85);}
     #moneyTab .mb-goal-panel .mb-panel-label{display:flex;align-items:center;}
     #moneyTab .mb-goal-edit-btn{margin-left:auto;width:auto;font-size:11px;font-weight:700;letter-spacing:0;text-transform:none;color:#4c8a1f;background:rgba(76,138,31,0.1);border:1px solid rgba(76,138,31,0.3);border-radius:10px;padding:4px 9px;box-shadow:none;cursor:pointer;}
-    #moneyTab .mb-goal-row{display:flex;gap:16px;margin-top:8px;}
-    #moneyTab .mb-goal-item{flex:1;min-width:0;}
-    #moneyTab .mb-goal-item-label{font-size:11px;color:#8b96a3;margin-bottom:5px;}
-    #moneyTab .mb-goal-bar{height:8px;border-radius:6px;background:#e6ebe0;overflow:hidden;margin-bottom:5px;}
+    #moneyTab .mb-goal-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px;}
+    #moneyTab .mb-goal-item{min-width:0;}
+    #moneyTab .mb-goal-item-head{display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:5px;}
+    #moneyTab .mb-goal-item-label{font-size:11px;color:#8b96a3;margin-bottom:0;}
+    #moneyTab .mb-goal-pct{font-size:10.5px;font-weight:800;color:#4c8a1f;background:rgba(76,138,31,0.12);border-radius:8px;padding:2px 6px;white-space:nowrap;}
+    #moneyTab .mb-goal-pct.over{color:#c97423;background:rgba(255,157,61,0.16);}
+    #moneyTab .mb-goal-bar{height:10px;border-radius:6px;background:#e6ebe0;overflow:hidden;margin-bottom:5px;}
     #moneyTab .mb-goal-bar-fill{height:100%;width:0%;background:#4c8a1f;border-radius:6px;transition:width .3s ease;}
     #moneyTab .mb-goal-bar-fill.over{background:#c97423;}
-    #moneyTab .mb-goal-item-text{font-size:11.5px;color:#555;}
+    #moneyTab .mb-goal-item-text{font-size:11.5px;color:#555;font-family:'JetBrains Mono',monospace,monospace;}
+    #moneyTab .mb-goal-left{font-size:10.5px;color:#8b96a3;margin-top:3px;}
+    #moneyTab .mb-goal-left.done{color:#4c8a1f;font-weight:700;}
+    #moneyTab .mb-goal-hint{font-size:10.5px;color:#8b96a3;margin-top:10px;line-height:1.45;}
     #moneyTab .mb-goal-edit{margin-top:14px;padding-top:12px;border-top:1px dashed #e0e6d8;}
     body.dark #moneyTab .mb-goal-edit-btn{background:rgba(143,212,90,0.18);color:#8fd45a;border-color:rgba(143,212,90,0.35);}
     body.dark #moneyTab .mb-goal-item-label{color:#8a919c;}
+    body.dark #moneyTab .mb-goal-pct{background:rgba(143,212,90,0.18);color:#8fd45a;}
+    body.dark #moneyTab .mb-goal-pct.over{background:rgba(255,157,61,0.22);color:#ffb673;}
     body.dark #moneyTab .mb-goal-bar{background:#2c2650;}
     body.dark #moneyTab .mb-goal-item-text{color:#b7bfc9;}
+    body.dark #moneyTab .mb-goal-left{color:#8a919c;}
+    body.dark #moneyTab .mb-goal-left.done{color:#8fd45a;}
+    body.dark #moneyTab .mb-goal-hint{color:#8a919c;}
     body.dark #moneyTab .mb-goal-edit{border-top-color:#2c4a30;}
     #moneyTab .mb-hist-empty{text-align:center;color:#8b96a3;font-size:13px;padding:14px 0;}
     #moneyTab .mb-hist-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 8px;}
     #moneyTab .mb-hist-title-row .mb-hist-title{margin:0;}
     #moneyTab .mb-chart-btn{width:auto;font-size:11.5px;font-weight:700;letter-spacing:0;text-transform:none;color:#4c8a1f;background:rgba(76,138,31,0.1);border:1px solid rgba(76,138,31,0.3);border-radius:10px;padding:6px 10px;box-shadow:none;cursor:pointer;white-space:nowrap;}
     #moneyTab .mb-chart-panel{background:#fff;border:1px solid #e6e6e6;border-radius:18px;padding:14px 14px 10px;margin-bottom:14px;box-shadow:0 2px 8px rgba(20,40,20,0.03);}
-    #moneyTab .mb-chart-panel select{width:100%;border:1px solid #ccc;border-radius:12px;padding:8px 10px;font-size:13px;margin-bottom:10px;}
+    #moneyTab .mb-chart-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+    #moneyTab .mb-chart-panel select{width:100%;border:1px solid #ccc;border-radius:12px;padding:8px 10px;font-size:13px;margin-bottom:0;}
     #moneyTab .mb-chart-summary{font-size:12.5px;color:#555;text-align:center;margin:8px 0 2px;font-weight:600;}
     #moneyTab .mb-chart-canvas-wrap{position:relative;height:220px;}
     body.dark #moneyTab .mb-chart-btn{background:rgba(143,212,90,0.18);color:#8fd45a;border-color:rgba(143,212,90,0.35);}
@@ -1952,6 +1980,16 @@
     body.dark #moneyTab .mb-sub-row{border-top-color:#2c4a30;}
     body.dark #moneyTab .mb-sub-row .mb-lab{color:#8a919c;}
     body.dark #moneyTab .mb-sub-row .mb-val{color:#eaeef2;}
+    body.dark #moneyTab .mb-stat-grid{border-top-color:#2c4a30;}
+    body.dark #moneyTab .mb-stat-lab{color:#8a919c;}
+    body.dark #moneyTab .mb-stat-val{color:#eaeef2;}
+    body.dark #moneyTab .mb-stat-val.pos{color:#8fd45a;}
+    body.dark #moneyTab .mb-stat-val.neg{color:#ff7a70;}
+    body.dark #moneyTab .mb-delta{color:#8a919c;}
+    body.dark #moneyTab .mb-delta.pos{color:#8fd45a;}
+    body.dark #moneyTab .mb-delta.neg{color:#ff7a70;}
+    body.dark #moneyTab .mb-hist-sub{color:#6b7480;}
+    body.dark #moneyTab .mb-v-lab{color:#6b7480;}
     body.dark #moneyTab .mb-group{background:#181231;border-color:#332c50;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
     body.dark #moneyTab .mb-group:focus-within{border-color:rgba(143,212,90,0.4);box-shadow:0 4px 14px rgba(0,0,0,0.35);}
     body.dark #moneyTab .mb-group-title{color:#8a99a8;}
@@ -1978,6 +2016,14 @@
     body.dark #moneyTab .mb-autosave-note .mb-tag.final{background:rgba(143,212,90,0.18);color:#8fd45a;}
     body.dark #moneyTab .mb-autosave-note .mb-tag.draft{background:rgba(255,157,61,0.22);color:#ffb673;}
     body.dark #moneyTab .mb-autosave-note .mb-dot-live{background:#8fd45a;}
+
+    /* Màn hình hẹp: xếp cặp ô nhập và 2 mục tiêu thành 1 cột cho dễ đọc */
+    @media (max-width: 380px){
+      #moneyTab .mb-pair{grid-template-columns:1fr;}
+      #moneyTab .mb-goal-row{grid-template-columns:1fr;}
+      #moneyTab .mb-stat-grid{grid-template-columns:1fr 1fr;}
+      #moneyTab .mb-stat-grid .mb-stat:last-child{grid-column:1 / -1;}
+    }
 
     /* Fallback chung: đảm bảo tab nào cũng không thể làm trang bị lệch ngang */
     .tab-content { max-width: 100%; overflow-x: hidden; }
@@ -2927,18 +2973,19 @@
 
     <!-- ---- TAB: SỔ TIỀN (Sổ Chạy Xe — ví App / tiền mặt / lời lãi theo ngày) ---- -->
     <div class="card tab-content" id="moneyTab">
-      <div class="mb-eyebrow">Sổ Chạy Xe · lưu ở sheet "Data_NhapTien"</div>
+      <div class="mb-eyebrow">Sổ Chạy Xe · tự động lưu vào Google Sheet</div>
       <div class="mb-date-row">
         <input type="date" class="mb-date-input" id="moneyDateInput">
-        <button class="mb-reload-btn" id="moneyReloadBtn" onclick="moneyReload()">⟳ Tải nháp</button>
+        <button class="mb-reload-btn" id="moneyReloadBtn" onclick="moneyReload()">⟳ Tải lại</button>
       </div>
 
       <div class="mb-panel">
-        <div class="mb-panel-label">Lời / lỗ hôm nay</div>
+        <div class="mb-panel-label" id="moneyLcdLabel">Lời / lỗ hôm nay</div>
         <div class="mb-lcd zero" id="moneyLcdMain">0 đ</div>
-        <div class="mb-sub-row">
-          <div><span class="mb-lab">Thực nhận App</span><span class="mb-val" id="moneyValApp">0 đ</span></div>
-          <div style="text-align:right;"><span class="mb-lab">Chi trong ngày</span><span class="mb-val" id="moneyValChi">0 đ</span></div>
+        <div class="mb-stat-grid">
+          <div class="mb-stat"><span class="mb-stat-lab">Doanh thu</span><span class="mb-stat-val" id="moneyValRevenue">0 đ</span></div>
+          <div class="mb-stat"><span class="mb-stat-lab">Chi phí</span><span class="mb-stat-val" id="moneyValChi">0 đ</span></div>
+          <div class="mb-stat"><span class="mb-stat-lab">Thu từ app</span><span class="mb-stat-val" id="moneyValApp">0 đ</span></div>
         </div>
       </div>
 
@@ -2946,16 +2993,19 @@
         <div class="mb-panel-label">Mục tiêu doanh thu<button type="button" class="mb-goal-edit-btn" onclick="toggleGoalEditForm()">Sửa</button></div>
         <div class="mb-goal-row">
           <div class="mb-goal-item">
-            <div class="mb-goal-item-label">Hôm nay</div>
+            <div class="mb-goal-item-head"><span class="mb-goal-item-label">Hôm nay</span><span class="mb-goal-pct" id="moneyGoalDayPct">–</span></div>
             <div class="mb-goal-bar"><div class="mb-goal-bar-fill" id="moneyGoalDayFill"></div></div>
             <div class="mb-goal-item-text" id="moneyGoalDayText">–</div>
+            <div class="mb-goal-left" id="moneyGoalDayLeft"></div>
           </div>
           <div class="mb-goal-item">
-            <div class="mb-goal-item-label">Tháng này</div>
+            <div class="mb-goal-item-head"><span class="mb-goal-item-label">Tháng này</span><span class="mb-goal-pct" id="moneyGoalMonthPct">–</span></div>
             <div class="mb-goal-bar"><div class="mb-goal-bar-fill" id="moneyGoalMonthFill"></div></div>
             <div class="mb-goal-item-text" id="moneyGoalMonthText">–</div>
+            <div class="mb-goal-left" id="moneyGoalMonthLeft"></div>
           </div>
         </div>
+        <div class="mb-goal-hint">Doanh thu = tiền công từ app + tip + đơn ngoài (chưa trừ chi phí).</div>
         <div class="mb-goal-edit hidden" id="moneyGoalEditForm">
           <div class="mb-field"><label>Mục tiêu mỗi ngày (đ)</label><input type="number" inputmode="decimal" id="moneyGoalDayInput" placeholder="0"></div>
           <div class="mb-field"><label>Mục tiêu mỗi tháng (đ)</label><input type="number" inputmode="decimal" id="moneyGoalMonthInput" placeholder="0"></div>
@@ -2966,8 +3016,11 @@
 
       <div class="mb-group">
         <div class="mb-group-title">Ví App (Shipper)</div>
-        <div class="mb-field"><label>Ví ban đầu</label><input type="number" inputmode="decimal" id="moneyViBD" placeholder="0"></div>
-        <div class="mb-field"><label>Ví còn lại</label><input type="number" inputmode="decimal" id="moneyViCL" placeholder="0"></div>
+        <div class="mb-pair">
+          <div class="mb-field"><label>Ví ban đầu</label><input type="number" inputmode="decimal" id="moneyViBD" placeholder="0"></div>
+          <div class="mb-field"><label>Ví còn lại</label><input type="number" inputmode="decimal" id="moneyViCL" placeholder="0"></div>
+        </div>
+        <div class="mb-delta" id="moneyViDelta">Chênh lệch: 0 đ</div>
       </div>
 
       <div class="mb-group">
@@ -2975,16 +3028,21 @@
           <span>Tiền mặt &amp; chuyển khoản</span>
           <button type="button" class="mb-copy-btn" id="mbCopyYesterdayBtn" onclick="copyYesterdayCashToToday(this)">⟵ Lấy tiền mặt hôm qua</button>
         </div>
-        <div class="mb-field"><label>Ban đầu (cầm trên tay)</label><input type="number" inputmode="decimal" id="moneyTmBD" placeholder="0"></div>
-        <div class="mb-field"><label>Thực có (cuối ngày)</label><input type="number" inputmode="decimal" id="moneyTmCL" placeholder="0"></div>
+        <div class="mb-pair">
+          <div class="mb-field"><label>Ban đầu (cầm trên tay)</label><input type="number" inputmode="decimal" id="moneyTmBD" placeholder="0"></div>
+          <div class="mb-field"><label>Thực có (cuối ngày)</label><input type="number" inputmode="decimal" id="moneyTmCL" placeholder="0"></div>
+        </div>
+        <div class="mb-delta" id="moneyTmDelta">Chênh lệch: 0 đ</div>
       </div>
 
       <div class="mb-group">
         <div class="mb-group-title">Thu thêm</div>
-        <div class="mb-field"><label>Tiền khách tip</label><input type="number" inputmode="decimal" id="moneyTip" placeholder="0"></div>
-        <div class="mb-field">
-          <label>Tiền đơn ngoài (tự cộng dồn phí ship mỗi khi chốt đơn ở tab "Trang chính")</label>
-          <input type="number" inputmode="decimal" id="moneyDonNgoai" placeholder="0">
+        <div class="mb-pair">
+          <div class="mb-field"><label>Tiền khách tip</label><input type="number" inputmode="decimal" id="moneyTip" placeholder="0"></div>
+          <div class="mb-field">
+            <label>Tiền đơn ngoài (tự cộng phí ship khi chốt đơn)</label>
+            <input type="number" inputmode="decimal" id="moneyDonNgoai" placeholder="0">
+          </div>
         </div>
       </div>
 
@@ -3010,12 +3068,18 @@
         <button type="button" class="mb-chart-btn" onclick="toggleMoneyChartPanel()">Biểu đồ doanh thu</button>
       </div>
       <div class="mb-chart-panel hidden" id="moneyChartPanel">
-        <select id="moneyChartPeriod" onchange="moneyRenderChart()">
-          <option value="7">7 ngày gần nhất</option>
-          <option value="30" selected>30 ngày gần nhất</option>
-          <option value="90">90 ngày gần nhất</option>
-          <option value="all">Tất cả</option>
-        </select>
+        <div class="mb-chart-controls">
+          <select id="moneyChartPeriod" onchange="moneyRenderChart()">
+            <option value="7">7 ngày gần nhất</option>
+            <option value="30" selected>30 ngày gần nhất</option>
+            <option value="90">90 ngày gần nhất</option>
+            <option value="all">Tất cả</option>
+          </select>
+          <select id="moneyChartMetric" onchange="moneyRenderChart()">
+            <option value="revenue" selected>Doanh thu</option>
+            <option value="loi">Lời / lỗ</option>
+          </select>
+        </div>
         <div class="mb-chart-canvas-wrap"><canvas id="moneyChartCanvas"></canvas></div>
         <div class="mb-chart-summary" id="moneyChartSummary"></div>
       </div>
@@ -3196,7 +3260,7 @@
     const ONBOARD_KEY = 'taxiapp_onboarded';
     // Phiên bản app hiển thị ở tab Cài đặt. Mỗi lần phát hành bản mới, tăng số này
     // ĐỒNG THỜI với VERSION trong sw.js để người dùng nhận được bản cập nhật.
-    const APP_VERSION = 'v8';
+    const APP_VERSION = 'v9';
     const fieldCoords = { origin: null, destination: null };
     let mapPicker = null;          // instance bản đồ Leaflet dùng riêng cho modal chọn vị trí
     let mapPickerWhich = null;     // 'origin' hoặc 'destination' đang được chọn
@@ -4620,18 +4684,23 @@
 
     // Cập nhật 1 ngày trong cache lịch sử (sau khi autosave) để không phải gọi lại
     // getAllEntries. Giữ thứ tự mới nhất trước như backend trả về.
-    function moneyUpsertHistoryItem_(dateStr, loi, status) {
+    function moneyUpsertHistoryItem_(dateStr, values, loi, thucNhanApp, status) {
       if (!moneyHistoryItems) return;
+      const patch = Object.assign({}, values || {}, {
+        date: dateStr,
+        loi: loi,
+        thucNhanApp: thucNhanApp,
+        status: status
+      });
       let found = false;
       for (let i = 0; i < moneyHistoryItems.length; i++) {
         if (moneyHistoryItems[i].date === dateStr) {
-          moneyHistoryItems[i].loi = loi;
-          moneyHistoryItems[i].status = status;
+          Object.assign(moneyHistoryItems[i], patch);
           found = true;
           break;
         }
       }
-      if (!found) moneyHistoryItems.push({ date: dateStr, loi: loi, status: status });
+      if (!found) moneyHistoryItems.push(patch);
       moneyHistoryItems.sort(function(a, b) { return a.date < b.date ? 1 : -1; });
     }
 
@@ -4655,6 +4724,16 @@
     function moneyNum(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
     function moneyFmt(n) { return Math.round(n).toLocaleString('vi-VN') + ' đ'; }
 
+    // Doanh thu = tiền công thực nhận từ app + tip + đơn ngoài.
+    // Vì loi = chênh lệch ví + chênh lệch tiền mặt = doanh thu - chi phí, nên:
+    //   doanh thu = loi + chi = thucNhanApp + tip + donNgoai.
+    function moneyRevenueOf_(it) {
+      it = it || {};
+      return (moneyNum(it.viCL) - moneyNum(it.viBD))
+           + (moneyNum(it.tmCL) - moneyNum(it.tmBD))
+           + moneyNum(it.chi);
+    }
+
     function moneyGetVals() {
       const v = {};
       moneyIds.forEach(function(id, i) { v[moneyFieldKeys[i]] = moneyNum(moneyEls[id].value); });
@@ -4666,7 +4745,34 @@
       const deltaTM = v.tmCL - v.tmBD;
       const loi = deltaVi + deltaTM;
       const thucNhanApp = deltaVi + deltaTM + v.chi - v.tip - v.donNgoai;
-      return { loi: loi, thucNhanApp: thucNhanApp, chi: v.chi };
+      const doanhThu = thucNhanApp + v.tip + v.donNgoai; // = loi + chi
+      return { loi: loi, thucNhanApp: thucNhanApp, doanhThu: doanhThu, chi: v.chi, deltaVi: deltaVi, deltaTM: deltaTM };
+    }
+
+    function moneySetDelta_(id, value) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = 'Chênh lệch: ' + (value > 0 ? '+' : '') + moneyFmt(value);
+      el.className = 'mb-delta ' + (value > 0 ? 'pos' : value < 0 ? 'neg' : '');
+    }
+
+    // Cập nhật thanh mục tiêu ngay khi người dùng đang nhập (chưa cần chờ autosave).
+    // Chỉ áp dụng khi đang xem đúng ngày hôm nay.
+    function moneyRefreshGoalLive_(todayRevenue) {
+      if (!currentUser || !moneyGoalCache) return;
+      const dateEl = document.getElementById('moneyDateInput');
+      if (!dateEl || dateEl.value !== moneyTodayStr()) return;
+      const todayStr = moneyTodayStr();
+      const monthPrefix = todayStr.slice(0, 7);
+      let monthRevenue = Number(todayRevenue) || 0;
+      if (moneyHistoryItems) {
+        moneyHistoryItems.forEach(function(it) {
+          if (it.date === todayStr) return;
+          if (String(it.date).slice(0, 7) === monthPrefix) monthRevenue += moneyRevenueOf_(it);
+        });
+        moneyUpdateGoalBar('moneyGoalMonthFill', 'moneyGoalMonthText', monthRevenue, moneyGoalCache.monthlyGoal, 'moneyGoalMonthPct', 'moneyGoalMonthLeft');
+      }
+      moneyUpdateGoalBar('moneyGoalDayFill', 'moneyGoalDayText', todayRevenue, moneyGoalCache.dailyGoal, 'moneyGoalDayPct', 'moneyGoalDayLeft');
     }
 
     function moneyRender() {
@@ -4675,8 +4781,12 @@
       const lcd = document.getElementById('moneyLcdMain');
       lcd.textContent = (r.loi > 0 ? '+' : '') + moneyFmt(r.loi);
       lcd.className = 'mb-lcd ' + (r.loi > 0 ? 'pos' : r.loi < 0 ? 'neg' : 'zero');
+      document.getElementById('moneyValRevenue').textContent = moneyFmt(r.doanhThu);
       document.getElementById('moneyValApp').textContent = moneyFmt(r.thucNhanApp);
       document.getElementById('moneyValChi').textContent = moneyFmt(r.chi);
+      moneySetDelta_('moneyViDelta', r.deltaVi);
+      moneySetDelta_('moneyTmDelta', r.deltaTM);
+      moneyRefreshGoalLive_(r.doanhThu);
     }
 
     moneyIds.forEach(function(id) {
@@ -4707,6 +4817,12 @@
       }
       moneyUpdateAutosaveNote();
       moneyUpdateToggleUI();
+      const labelEl = document.getElementById('moneyLcdLabel');
+      if (labelEl) {
+        labelEl.textContent = (dateStr === moneyTodayStr())
+          ? 'Lời / lỗ hôm nay'
+          : (dateStr ? 'Lời / lỗ ngày ' + dateStr.split('-').reverse().join('/') : 'Lời / lỗ');
+      }
       moneyRender();
       moneySuppressAutosave = false;
     }
@@ -4743,7 +4859,7 @@
         moneyUpdateAutosaveNote(hh + ':' + mm);
         // Cập nhật lịch sử + thanh mục tiêu bằng cache, KHÔNG gọi lại getAllEntries.
         if (moneyHistoryItems) {
-          moneyUpsertHistoryItem_(dateStr, r.loi, moneyCurrentStatus);
+          moneyUpsertHistoryItem_(dateStr, v, r.loi, r.thucNhanApp, moneyCurrentStatus);
           moneyUpdateHistoryRow_(dateStr, r.loi, moneyCurrentStatus);
           moneyLoadGoalProgress(moneyHistoryItems);
         }
@@ -4820,6 +4936,21 @@
       }
     }
 
+    function moneyDateLabel_(dateStr) {
+      const todayStr = moneyTodayStr();
+      const d = new Date(dateStr + 'T00:00:00');
+      if (isNaN(d.getTime())) return dateStr;
+      const dd = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+      if (dateStr === todayStr) return 'Hôm nay · ' + dd;
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      const yOff = y.getTimezoneOffset();
+      const yStr = new Date(y.getTime() - yOff * 60000).toISOString().slice(0, 10);
+      if (dateStr === yStr) return 'Hôm qua · ' + dd;
+      const weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+      return weekdays[d.getDay()] + ' · ' + dd;
+    }
+
     function moneyRenderHistoryList_(items) {
       const histList = document.getElementById('moneyHistList');
       if (!items || items.length === 0) {
@@ -4834,13 +4965,18 @@
         const cls = item.loi > 0 ? 'pos' : item.loi < 0 ? 'neg' : '';
         const tagCls = item.status === 'final' ? 'final' : 'draft';
         const tagLabel = item.status === 'final' ? 'Đã chốt' : 'Nháp';
+        const revenue = moneyRevenueOf_(item);
         row.innerHTML =
-          '<div class="mb-hist-row"><div class="mb-d">' + item.date + '</div>' +
-          '<span class="mb-tag ' + tagCls + '">' + tagLabel + '</span></div>' +
-          '<div style="display:flex;align-items:center;justify-content:flex-end;">' +
-          '<div class="mb-v ' + cls + '">' + (item.loi > 0 ? '+' : '') + moneyFmt(item.loi) + '</div>' +
-          '<button class="mb-del" title="Xóa">✕</button></div>';
-        row.querySelector('.mb-hist-row').addEventListener('click', function() {
+          '<div class="mb-hist-row">' +
+            '<div><div class="mb-d">' + moneyDateLabel_(item.date) + '</div>' +
+            '<div class="mb-hist-sub">DT ' + moneyFmt(revenue) + ' · Chi ' + moneyFmt(moneyNum(item.chi)) + '</div></div>' +
+            '<span class="mb-tag ' + tagCls + '">' + tagLabel + '</span>' +
+          '</div>' +
+          '<div class="mb-hist-bottom">' +
+            '<div class="mb-v ' + cls + '"><span class="mb-v-lab">Lời/lỗ</span> ' + (item.loi > 0 ? '+' : '') + moneyFmt(item.loi) + '</div>' +
+            '<button class="mb-del" title="Xóa">✕</button>' +
+          '</div>';
+        row.addEventListener('click', function() {
           document.getElementById('moneyDateInput').value = item.date;
           moneyLoadEntry(item.date);
         });
@@ -4862,11 +4998,17 @@
         return;
       }
       const valueEl = row.querySelector('.mb-v');
-      valueEl.textContent = (loi > 0 ? '+' : '') + moneyFmt(loi);
+      valueEl.innerHTML = '<span class="mb-v-lab">Lời/lỗ</span> ' + (loi > 0 ? '+' : '') + moneyFmt(loi);
       valueEl.className = 'mb-v ' + (loi > 0 ? 'pos' : loi < 0 ? 'neg' : '');
       const tagEl = row.querySelector('.mb-tag');
       tagEl.className = 'mb-tag ' + (status === 'final' ? 'final' : 'draft');
       tagEl.textContent = status === 'final' ? 'Đã chốt' : 'Nháp';
+      let cached = null;
+      (moneyHistoryItems || []).forEach(function(it) { if (it.date === dateStr) cached = it; });
+      const subEl = row.querySelector('.mb-hist-sub');
+      if (cached && subEl) {
+        subEl.textContent = 'DT ' + moneyFmt(moneyRevenueOf_(cached)) + ' · Chi ' + moneyFmt(moneyNum(cached.chi));
+      }
     }
 
     // ================= BIỂU ĐỒ DOANH THU (lấy dữ liệu từ Sổ Chạy Xe) =================
@@ -4886,6 +5028,7 @@
       summaryEl.textContent = 'Đang tải...';
       try {
         const period = document.getElementById('moneyChartPeriod').value;
+        const metric = document.getElementById('moneyChartMetric').value;
         const items = await moneyFetchHistory_();
         let filtered = (items || []).slice().sort(function(a, b) { return a.date < b.date ? -1 : 1; });
         if (period !== 'all') {
@@ -4899,10 +5042,13 @@
         }
 
         const labels = filtered.map(function(it) { return it.date.slice(5); });
-        const values = filtered.map(function(it) { return Number(it.loi) || 0; });
+        const values = filtered.map(function(it) {
+          return metric === 'revenue' ? moneyRevenueOf_(it) : (Number(it.loi) || 0);
+        });
         const colors = values.map(function(v) { return v >= 0 ? '#4c8a1f' : '#d3453a'; });
         const total = values.reduce(function(s, v) { return s + v; }, 0);
-        summaryEl.textContent = 'Tổng lời/lỗ: ' + (total >= 0 ? '+' : '') + moneyFmt(total) + ' trong ' + values.length + ' ngày';
+        const metricLabel = metric === 'revenue' ? 'Doanh thu' : 'Lời/lỗ';
+        summaryEl.textContent = 'Tổng ' + metricLabel.toLowerCase() + ': ' + (total >= 0 ? '+' : '') + moneyFmt(total) + ' trong ' + values.length + ' ngày';
 
         const isDark = document.body.classList.contains('dark');
         const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
@@ -4916,7 +5062,7 @@
           data: {
             labels: labels,
             datasets: [{
-              label: 'Lời / lỗ theo ngày',
+              label: metricLabel + ' theo ngày',
               data: values,
               backgroundColor: colors,
               borderRadius: 6,
@@ -4957,34 +5103,52 @@
         const list = items || moneyHistoryItems || await moneyFetchHistory_();
         const todayStr = moneyTodayStr();
         const monthPrefix = todayStr.slice(0, 7);
-        let todayLoi = 0, monthLoi = 0;
+        let todayRevenue = 0, monthRevenue = 0;
         (list || []).forEach(function(it) {
-          const v = Number(it.loi) || 0;
-          if (it.date === todayStr) todayLoi = v;
-          if (it.date.slice(0, 7) === monthPrefix) monthLoi += v;
+          const v = moneyRevenueOf_(it);
+          if (it.date === todayStr) todayRevenue = v;
+          if (String(it.date).slice(0, 7) === monthPrefix) monthRevenue += v;
         });
 
-        moneyUpdateGoalBar('moneyGoalDayFill', 'moneyGoalDayText', todayLoi, goal.dailyGoal);
-        moneyUpdateGoalBar('moneyGoalMonthFill', 'moneyGoalMonthText', monthLoi, goal.monthlyGoal);
+        moneyUpdateGoalBar('moneyGoalDayFill', 'moneyGoalDayText', todayRevenue, goal.dailyGoal, 'moneyGoalDayPct', 'moneyGoalDayLeft');
+        moneyUpdateGoalBar('moneyGoalMonthFill', 'moneyGoalMonthText', monthRevenue, goal.monthlyGoal, 'moneyGoalMonthPct', 'moneyGoalMonthLeft');
       } catch (e) {
         // im lặng bỏ qua, không chặn các phần khác của tab Sổ tiền
       }
     }
 
-    function moneyUpdateGoalBar(fillId, textId, current, goal) {
+    function moneyUpdateGoalBar(fillId, textId, current, goal, pctId, leftId) {
       const fillEl = document.getElementById(fillId);
       const textEl = document.getElementById(textId);
+      const pctEl = pctId ? document.getElementById(pctId) : null;
+      const leftEl = leftId ? document.getElementById(leftId) : null;
+      current = Number(current) || 0;
       goal = Number(goal) || 0;
       if (goal <= 0) {
         fillEl.style.width = '0%';
         fillEl.classList.remove('over');
-        textEl.textContent = moneyFmt(current) + ' · chưa đặt mục tiêu';
+        textEl.textContent = moneyFmt(current);
+        if (pctEl) { pctEl.textContent = '–'; pctEl.classList.remove('over'); }
+        if (leftEl) { leftEl.textContent = 'Chưa đặt mục tiêu'; leftEl.classList.remove('done'); }
         return;
       }
       const pct = Math.round((current / goal) * 100);
       fillEl.style.width = Math.min(100, Math.max(0, pct)) + '%';
       fillEl.classList.toggle('over', pct > 100);
-      textEl.textContent = moneyFmt(current) + ' / ' + moneyFmt(goal) + ' (' + pct + '%)';
+      textEl.textContent = moneyFmt(current) + ' / ' + moneyFmt(goal);
+      if (pctEl) {
+        pctEl.textContent = pct + '%';
+        pctEl.classList.toggle('over', pct > 100);
+      }
+      if (leftEl) {
+        if (current >= goal) {
+          leftEl.textContent = 'Đã đạt mục tiêu 🎉';
+          leftEl.classList.add('done');
+        } else {
+          leftEl.textContent = 'Còn thiếu ' + moneyFmt(goal - current);
+          leftEl.classList.remove('done');
+        }
+      }
     }
 
     function toggleGoalEditForm() {
@@ -5034,9 +5198,9 @@
       // Người dùng chủ động bấm tải lại: làm mới cả lịch sử/mục tiêu từ Sheet.
       moneyRenderHistory(true);
       btn.classList.remove('spin');
-      btn.textContent = '⟳ Tải nháp';
+      btn.textContent = '⟳ Tải lại';
       const statusMsg = document.getElementById('moneyStatusMsg');
-      statusMsg.textContent = 'Đã tải dữ liệu nháp mới nhất từ sheet';
+      statusMsg.textContent = 'Đã tải dữ liệu mới nhất từ Sheet';
       setTimeout(function() { statusMsg.textContent = ''; }, 2000);
     }
 
