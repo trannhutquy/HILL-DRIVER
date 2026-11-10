@@ -10,8 +10,9 @@
   <meta name="apple-mobile-web-app-title" content="Hill Driver">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <script src="config.js"></script>
-  <script src="gas-shim.js"></script>
+  <!-- defer: không chặn việc dựng giao diện, vẫn chạy xong trước DOMContentLoaded (bootApp) -->
+  <script src="config.js" defer></script>
+  <script src="gas-shim.js" defer></script>
   <script>
     // ===== TẢI THƯ VIỆN KHI CẦN (lazy-load) =====
     // Leaflet / Chart.js / jsPDF / html2canvas chỉ được tải khi thật sự dùng tới,
@@ -145,7 +146,11 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Font tải KHÔNG chặn hiển thị: app hiện ngay bằng font hệ thống, font xịn thay vào sau.
+       Trước đây thẻ stylesheet này chặn render vài trăm ms - giờ bỏ hẳn khỏi đường tới hạn. -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -3563,7 +3568,7 @@
     const ONBOARD_KEY = 'taxiapp_onboarded';
     // Phiên bản app hiển thị ở tab Cài đặt. Mỗi lần phát hành bản mới, tăng số này
     // ĐỒNG THỜI với VERSION trong sw.js để người dùng nhận được bản cập nhật.
-    const APP_VERSION = 'v12';
+    const APP_VERSION = 'v13';
     const fieldCoords = { origin: null, destination: null };
     // Tải trước để bấm "Tính tiền" nhanh hơn:
     // - prefetchedGeo: toạ độ đã tìm sẵn trong lúc người dùng đang gõ địa chỉ
@@ -3667,9 +3672,10 @@
     });
 
     // ---------- INTRO THƯƠNG HIỆU HILL DRIVER ----------
-    // Giữ màn intro tối thiểu 5 giây trước khi chuyển sang đăng nhập/app.
-    // Nếu server phản hồi chậm hơn 5 giây thì không cộng thêm thời gian chờ.
-    const SPLASH_EXTRA_MS = 5000;
+    // Intro rất ngắn (0,6 giây) để app vào nhanh. Người chưa đăng nhập thì bỏ qua intro,
+    // hiện thẳng màn đăng nhập; người đã đăng nhập thì vào app ngay bằng thông tin đã lưu
+    // rồi kiểm tra token ở chế độ nền.
+    const SPLASH_EXTRA_MS = 600;
     let splashStartedAt = Date.now();
 
     function finishInitialSplash_(callback) {
@@ -3678,51 +3684,135 @@
       setTimeout(callback, remaining);
     }
 
+    // ---------- NHỚ PHIÊN ĐĂNG NHẬP ĐỂ MỞ APP TỨC THÌ ----------
+    // Lưu username + tên hiển thị của lần đăng nhập gần nhất. Khi mở lại app, dùng luôn
+    // thông tin này để vào thẳng giao diện, KHÔNG phải chờ Apps Script trả lời.
+    const USER_CACHE_KEY = 'taxiapp_session_user';
+
+    function readCachedUser_() {
+      try {
+        const raw = localStorage.getItem(USER_CACHE_KEY);
+        if (!raw) return null;
+        const o = JSON.parse(raw);
+        if (!o || !o.username || !o.fullName) return null;
+        return { username: String(o.username), fullName: String(o.fullName) };
+      } catch (e) { return null; }
+    }
+
+    function cacheUser_(username, fullName) {
+      try {
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify({ username: username, fullName: fullName }));
+      } catch (e) {}
+    }
+
+    function clearSession_() {
+      try {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_CACHE_KEY);
+        localStorage.removeItem('taxiapp_price_cache');
+      } catch (e) {}
+    }
+
+    // Kiểm tra token ở chế độ nền, KHÔNG chặn việc vào app:
+    // - Hợp lệ -> cập nhật lại tên hiển thị nếu ADMIN đã đổi.
+    // - Token sai/hết hạn -> đăng xuất về màn đăng nhập.
+    // - Lỗi mạng -> giữ nguyên phiên (app vẫn dùng được, chỉ đồng bộ sau).
+    // Chờ 3,5 giây trước khi kiểm tra để không tranh chỗ với loạt dữ liệu đầu tiên.
+    function validateSessionInBackground_(token, cachedUser) {
+      let attempt = 0;
+
+      function ask() {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (localStorage.getItem(TOKEN_KEY) !== token) return; // đã đăng xuất / đổi phiên
+            if (res && res.success) {
+              if (res.username && res.fullName &&
+                  (res.username !== cachedUser.username || res.fullName !== cachedUser.fullName)) {
+                cacheUser_(res.username, res.fullName);
+                if (currentUser && currentUser.username === cachedUser.username) {
+                  currentUser.fullName = res.fullName;
+                  ['userNameDisplay', 'settingsUserName', 'adminUserName', 'adminSidebarUserName'].forEach(function(id) {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = res.fullName;
+                  });
+                }
+              }
+              return;
+            }
+            // Token sai: xác nhận lại 1 lần (tránh lỗi tạm thời của máy chủ làm đăng xuất oan)
+            attempt++;
+            if (attempt < 2) {
+              setTimeout(ask, 2000);
+            } else {
+              clearSession_();
+              currentUser = null;
+              showLogin('login');
+            }
+          })
+          .withFailureHandler(function() { /* mất mạng: giữ phiên đã lưu */ })
+          .validateSession(token);
+      }
+
+      setTimeout(ask, 3500);
+    }
+
     // ---------- KHỞI ĐỘNG APP: kiểm tra token đã lưu ----------
     // Tách thành hàm riêng bootApp() để có thể gọi lại từ nút "Tải lại app" (reloadApp)
     // MÀ KHÔNG dùng location.reload() — vì Google Apps Script nhúng trang trong 1 iframe
     // dùng đường dẫn tạm có mã phiên riêng; tải lại y hệt URL đó sẽ ra trang trắng và bị đứng.
     function bootApp() {
-      // Mỗi lần khởi động/tải lại app đều chạy lại thời lượng intro thương hiệu.
+      // Mỗi lần khởi động/tải lại app đều chạy lại intro thương hiệu (rất ngắn).
       splashStartedAt = Date.now();
 
       applyDarkModePreference();
 
       const savedToken = localStorage.getItem(TOKEN_KEY);
-      if (savedToken) {
-        // Chốt an toàn: nếu sau 15s server vẫn chưa phản hồi (mất mạng, Apps Script "ngủ"...),
-        // tự động chuyển sang màn hình đăng nhập thay vì treo mãi ở màn hình trắng "Đang kiểm tra...".
-        let settled = false;
-        const failSafeTimer = setTimeout(function() {
+      if (!savedToken) {
+        // Chưa đăng nhập lần nào -> hiện màn đăng nhập NGAY, không bắt chờ intro.
+        showLogin('login');
+        return;
+      }
+
+      // Đã đăng nhập trước đó: vào app NGAY bằng thông tin đã lưu.
+      const cachedUser = readCachedUser_();
+      if (cachedUser) {
+        finishInitialSplash_(function() {
+          enterApp(cachedUser.username, cachedUser.fullName, savedToken);
+        });
+        validateSessionInBackground_(savedToken, cachedUser);
+        return;
+      }
+
+      // Máy mới / bản cũ chưa lưu thông tin: phải hỏi máy chủ 1 lần.
+      // Chốt an toàn: quá 8 giây không phản hồi thì hiện đăng nhập thay vì treo ở màn hình chờ.
+      let settled = false;
+      const failSafeTimer = setTimeout(function() {
+        if (settled) return;
+        settled = true;
+        finishInitialSplash_(function() { showLogin('login'); });
+      }, 8000);
+
+      google.script.run
+        .withSuccessHandler(function(res) {
           if (settled) return;
           settled = true;
-          finishInitialSplash_(function() { showLogin('login'); });
-        }, 15000);
-
-        google.script.run
-          .withSuccessHandler(function(res) {
-            if (settled) return;
-            settled = true;
-            clearTimeout(failSafeTimer);
-            if (res.success) {
-              finishInitialSplash_(function() {
-                enterApp(res.username, res.fullName, savedToken);
-              });
-            } else {
-              localStorage.removeItem(TOKEN_KEY);
-              finishInitialSplash_(function() { showLogin('login'); });
-            }
-          })
-          .withFailureHandler(function() {
-            if (settled) return;
-            settled = true;
-            clearTimeout(failSafeTimer);
+          clearTimeout(failSafeTimer);
+          if (res.success) {
+            finishInitialSplash_(function() {
+              enterApp(res.username, res.fullName, savedToken);
+            });
+          } else {
+            clearSession_();
             finishInitialSplash_(function() { showLogin('login'); });
-          })
-          .validateSession(savedToken);
-      } else {
-        finishInitialSplash_(function() { showLogin('login'); });
-      }
+          }
+        })
+        .withFailureHandler(function() {
+          if (settled) return;
+          settled = true;
+          clearTimeout(failSafeTimer);
+          finishInitialSplash_(function() { showLogin('login'); });
+        })
+        .validateSession(savedToken);
     }
     window.addEventListener('DOMContentLoaded', bootApp);
 
@@ -3750,6 +3840,7 @@
       moneyResetState_();
       currentUser = { username: username, fullName: fullName, token: token };
       localStorage.setItem(TOKEN_KEY, token);
+      cacheUser_(username, fullName); // nhớ phiên để lần mở sau vào app ngay
       hideAuthCards();
 
       // Tải sẵn thư viện bản đồ trong lúc rảnh (sau 2 giây) để lúc mở bản đồ
@@ -5965,7 +6056,7 @@
     function doLogout() {
       const token = localStorage.getItem(TOKEN_KEY);
       if (token) google.script.run.logoutSession(token);
-      localStorage.removeItem(TOKEN_KEY);
+      clearSession_();
       currentUser = null;
       moneyResetState_();
       lastTrip = null;
@@ -6000,31 +6091,46 @@
     }
 
     // ---------- GIÁ / KM (hiển thị nhanh ở trang chính) ----------
+    // Hiển thị bảng giá hiện tại lên thẻ "Giá tiền". Tách riêng để có thể vẽ ngay
+    // bằng dữ liệu đã lưu (không chờ máy chủ) rồi cập nhật lại sau.
+    function renderPriceTiers_(tiers, animate) {
+      const isTiered = Array.isArray(tiers) && tiers.length > 1;
+      const displayEl = document.getElementById('currentPriceDisplay');
+      const editLink = document.getElementById('priceEditLink');
+      const tieredHint = document.getElementById('tieredActiveHint');
+      const priceBox = document.querySelector('.price-box');
+      if (animate && priceBox) {
+        priceBox.classList.remove('pulse');
+        void priceBox.offsetWidth; // reset animation
+        priceBox.classList.add('pulse');
+      }
+
+      if (isTiered) {
+        displayEl.textContent = 'Đang áp dụng giá luỹ kế';
+        editLink.classList.add('hidden');
+        tieredHint.classList.remove('hidden');
+        document.getElementById('priceEditRow').classList.remove('active');
+      } else {
+        const flatPrice = tiers && tiers[0] ? tiers[0].price : 0;
+        displayEl.textContent = Number(flatPrice).toLocaleString('vi-VN') + ' đ/km';
+        editLink.classList.remove('hidden');
+        tieredHint.classList.add('hidden');
+      }
+    }
+
     function loadCurrentPrice() {
+      // Vẽ ngay giá của lần mở trước (nếu có) -> không phải nhìn ô trống trong lúc chờ mạng
+      try {
+        const cached = JSON.parse(localStorage.getItem('taxiapp_price_cache') || 'null');
+        if (Array.isArray(cached) && cached.length) renderPriceTiers_(cached, false);
+      } catch (e) {}
+
       google.script.run
         .withSuccessHandler(function(tiers) {
-          const isTiered = Array.isArray(tiers) && tiers.length > 1;
-          const displayEl = document.getElementById('currentPriceDisplay');
-          const editLink = document.getElementById('priceEditLink');
-          const tieredHint = document.getElementById('tieredActiveHint');
-          const priceBox = document.querySelector('.price-box');
-          if (priceBox) {
-            priceBox.classList.remove('pulse');
-            void priceBox.offsetWidth; // reset animation
-            priceBox.classList.add('pulse');
-          }
-
-          if (isTiered) {
-            displayEl.textContent = 'Đang áp dụng giá luỹ kế';
-            editLink.classList.add('hidden');
-            tieredHint.classList.remove('hidden');
-            document.getElementById('priceEditRow').classList.remove('active');
-          } else {
-            const flatPrice = tiers && tiers[0] ? tiers[0].price : 0;
-            displayEl.textContent = Number(flatPrice).toLocaleString('vi-VN') + ' đ/km';
-            editLink.classList.remove('hidden');
-            tieredHint.classList.add('hidden');
-          }
+          renderPriceTiers_(tiers, true);
+          try {
+            if (Array.isArray(tiers)) localStorage.setItem('taxiapp_price_cache', JSON.stringify(tiers));
+          } catch (e) {}
         })
         .getPriceTiers(currentUser.username);
     }
@@ -6053,6 +6159,7 @@
         .withSuccessHandler(function(res) {
           if (res.success) {
             document.getElementById('currentPriceDisplay').textContent = Number(res.newPrice).toLocaleString('vi-VN') + ' đ/km';
+            try { localStorage.removeItem('taxiapp_price_cache'); } catch (e) {}
             togglePriceEdit();
           } else {
             errorBox.textContent = res.message;
